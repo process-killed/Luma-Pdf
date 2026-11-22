@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Developer documentation — Luma PDF</title>
+<meta name="description" content="Embed parameters, postMessage API, deployment recipes, CORS, security and performance notes for Luma PDF.">
+<meta name="theme-color" content="#fcfcfd">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css?v=1.0.0">
+<link rel="stylesheet" href="css/reset.css?v=1.0.0">
+<link rel="stylesheet" href="css/themes.css?v=1.0.0">
+<link rel="stylesheet" href="css/main.css?v=1.0.0">
+<link rel="stylesheet" href="css/layout.css?v=1.0.0">
+<link rel="stylesheet" href="css/animations.css?v=1.0.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.0.0">
+<script>
+  try {
+    var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
+    var mode = s.theme || 'auto';
+    var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) {}
+</script>
+</head>
+<body class="view-app">
+<a class="skip-link" href="#main">Skip to content</a>
+<header data-shell="header"></header>
+
+<main id="main">
+  <div class="page-head">
+    <div class="container">
+      <span class="eyebrow">Documentation</span>
+      <h1>Developer guide</h1>
+      <p>Everything you need to embed Luma PDF, drive it from JavaScript, and deploy the whole thing on static hosting.</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation sections">
+        <div class="docs-group">Getting started</div>
+        <a href="#overview">Overview</a>
+        <a href="#quickstart">Quick start</a>
+        <div class="docs-group">Embedding</div>
+        <a href="#embedding">Embed endpoint</a>
+        <a href="#parameters">Parameters</a>
+        <a href="#recipes">Platform recipes</a>
+        <div class="docs-group">API</div>
+        <a href="#api">postMessage API</a>
+        <a href="#events">Viewer events</a>
+        <a href="#sdk">Parent-side helper</a>
+        <div class="docs-group">Operations</div>
+        <a href="#deployment">Deployment</a>
+        <a href="#cors">CORS &amp; remote PDFs</a>
+        <a href="#security">Security</a>
+        <a href="#performance">Performance</a>
+        <a href="#testing">Testing</a>
+        <a href="#limits">Limitations</a>
+      </nav>
+
+      <article class="prose">
+        <h2 id="overview">Overview</h2>
+        <p>Luma PDF is a static, browser-only PDF workspace. It has three surfaces:</p>
+        <ul>
+          <li><strong>Viewer</strong> (<code>viewer.html</code>) — reading, search, annotations, export.</li>
+          <li><strong>Tools</strong> (<code>tools.html</code>) — 33 utilities built on pdf-lib and PDF.js.</li>
+          <li><strong>Embed</strong> (<code>embed.html</code>) — a chrome-light viewer configured entirely by URL parameters.</li>
+        </ul>
+        <p>There is no server component. Rendering uses PDF.js (Apache-2.0), editing uses pdf-lib (MIT), and both are vendored in <code>vendor/</code> so the app works offline and needs no CDN.</p>
+        <div class="note">Browsers enforce cross-origin rules. A PDF hosted on another domain only loads if that server sends <code>Access-Control-Allow-Origin</code>. No client-side app can override this — see <a href="#cors">CORS</a>.</div>
+
+        <h2 id="quickstart">Quick start</h2>
+        <p>Deploy the folder to any static host, then embed a PDF:</p>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>&lt;iframe
+  src="https://your-domain.example/embed.html?file=https://your-domain.example/report.pdf"
+  width="100%" height="700" style="border:0"
+  loading="lazy" allowfullscreen title="Luma PDF Viewer"
+&gt;&lt;/iframe&gt;</pre></div>
+        <p>Or generate the snippet interactively with the <a href="embed-generator.html">Embed Generator</a>.</p>
+
+        <h2 id="embedding">Embed endpoint</h2>
+        <p><code>embed.html?file=PDF_URL&amp;…</code></p>
+        <p>The embed loads the document immediately, keeps no branding beyond a small optional mark, and never navigates to the homepage. It is responsive, touch-friendly and independent of the main site layout.</p>
+        <h3>Minimal</h3>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>embed.html?file=/files/whitepaper.pdf</pre></div>
+        <h3>Configured</h3>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>embed.html?file=/files/whitepaper.pdf&amp;page=3&amp;zoom=page-fit
+  &amp;toolbar=1&amp;sidebar=1&amp;search=1&amp;download=0&amp;print=0
+  &amp;theme=dark&amp;background=dark&amp;pageMode=spread&amp;direction=rtl</pre></div>
+        <div class="note">Unknown parameters are ignored, never fatal. Invalid values fall back to defaults and the viewer reports them on the console.</div>
+
+        <h2 id="parameters">Parameters</h2>
+        <p>Boolean parameters accept <code>1/0</code>, <code>true/false</code>, <code>yes/no</code>, <code>on/off</code>, <code>show/hide</code>.</p>
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>file</code></td><td>URL</td><td>—</td><td>Absolute or same-origin URL of the PDF. Required.</td></tr>
+            <tr><td><code>page</code></td><td>int</td><td>1</td><td>Page to open on load.</td></tr>
+            <tr><td><code>zoom</code></td><td>enum / int</td><td>page-width</td><td><code>page-width</code>, <code>page-fit</code>, <code>actual</code>, or 50–500.</td></tr>
+            <tr><td><code>fit</code></td><td>enum</td><td>—</td><td><code>width</code>, <code>page</code> or <code>auto</code>; alias for zoom fitting.</td></tr>
+            <tr><td><code>toolbar</code></td><td>bool</td><td>1</td><td>Show the control bar.</td></tr>
+            <tr><td><code>sidebar</code></td><td>bool</td><td>0</td><td>Show the thumbnails/outline panel.</td></tr>
+            <tr><td><code>navigation</code></td><td>bool</td><td>1</td><td>Show page navigation.</td></tr>
+            <tr><td><code>search</code></td><td>bool</td><td>1</td><td>Enable in-document search.</td></tr>
+            <tr><td><code>download</code></td><td>bool</td><td>1</td><td>Show the download button.</td></tr>
+            <tr><td><code>print</code></td><td>bool</td><td>1</td><td>Show the print button.</td></tr>
+            <tr><td><code>fullscreen</code></td><td>bool</td><td>1</td><td>Show the fullscreen button.</td></tr>
+            <tr><td><code>controls</code></td><td>enum</td><td>auto</td><td><code>auto</code>, <code>always</code>, <code>never</code> for touch chrome.</td></tr>
+            <tr><td><code>mobileToolbar</code></td><td>bool</td><td>1</td><td>Use the compact bottom bar on phones.</td></tr>
+            <tr><td><code>theme</code></td><td>enum</td><td>auto</td><td><code>light</code>, <code>dark</code>, <code>auto</code>.</td></tr>
+            <tr><td><code>background</code></td><td>enum</td><td>light</td><td><code>light</code>, <code>dark</code>, <code>sepia</code>, <code>slate</code>, <code>paper</code>.</td></tr>
+            <tr><td><code>pageMode</code></td><td>enum</td><td>vertical</td><td><code>single</code>, <code>vertical</code>, <code>horizontal</code>, <code>spread</code>, <code>book</code>.</td></tr>
+            <tr><td><code>scroll</code></td><td>enum</td><td>—</td><td><code>vertical</code> or <code>horizontal</code> shortcut.</td></tr>
+            <tr><td><code>spread</code></td><td>bool</td><td>0</td><td>Shortcut for a two-page spread.</td></tr>
+            <tr><td><code>direction</code></td><td>enum</td><td>ltr</td><td><code>ltr</code> or <code>rtl</code> reading direction.</td></tr>
+            <tr><td><code>language</code></td><td>string</td><td>en</td><td>Sets the document language for assistive tech.</td></tr>
+            <tr><td><code>annotations</code></td><td>bool</td><td>0</td><td>Enable viewer-side annotation tools.</td></tr>
+            <tr><td><code>outline</code></td><td>bool</td><td>0</td><td>Show the outline tab in the sidebar.</td></tr>
+            <tr><td><code>readonly</code></td><td>bool</td><td>0</td><td>Disables download, print and annotations.</td></tr>
+            <tr><td><code>minimal</code></td><td>bool</td><td>0</td><td>Compact chrome, no sidebar or print.</td></tr>
+            <tr><td><code>hideLogo</code></td><td>bool</td><td>0</td><td>Hide the small Luma PDF mark.</td></tr>
+            <tr><td><code>watermark</code></td><td>string</td><td>—</td><td>Faint text overlaid on the reading area.</td></tr>
+            <tr><td><code>origin</code></td><td>list</td><td>same origin</td><td>Extra origins allowed to send commands, comma separated.</td></tr>
+          </tbody>
+        </table>
+        <div class="note warn"><strong>Hiding a download button is not DRM.</strong> Anyone who can read the PDF in a browser can save it. Use server-side authentication for genuinely restricted documents.</div>
+
+        <h2 id="recipes">Platform recipes</h2>
+        <h3>Blogger</h3>
+        <p>In the post editor switch to HTML view and paste the iframe. Blogger strips some attributes, so keep it simple:</p>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>&lt;iframe src="https://your-domain.example/embed.html?file=https://example.com/report.pdf"
+  width="100%" height="640" style="border:0"&gt;&lt;/iframe&gt;</pre></div>
+        <h3>WordPress</h3>
+        <p>Use a <em>Custom HTML</em> block (not the paragraph block, which escapes iframes). Self-hosted sites can also add it to a page template.</p>
+        <h3>GitHub Pages</h3>
+        <p>Put the PDF next to the HTML and use a relative URL. GitHub Pages serves PDFs with <code>Content-Type: application/pdf</code> and allows same-origin reads, so no CORS setup is needed:</p>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>&lt;iframe src="/embed.html?file=/docs/report.pdf" width="100%" height="700" style="border:0"&gt;&lt;/iframe&gt;</pre></div>
+        <h3>Cloudflare Pages / Netlify / Vercel</h3>
+        <p>Upload the folder as a static site. Nothing else is required; the included <code>deployment/</code> files add sensible headers.</p>
+        <h3>Responsive pattern</h3>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>&lt;div style="position:relative;padding-top:min(75vh,720px)"&gt;
+  &lt;iframe src="https://your-domain.example/embed.html?file=/report.pdf"
+    style="position:absolute;inset:0;width:100%;height:100%;border:0"
+    loading="lazy" allowfullscreen title="Report"&gt;&lt;/iframe&gt;
+&lt;/div&gt;</pre></div>
+
+        <h2 id="api">postMessage API</h2>
+        <p>Commands are only accepted from the parent window, and only from the same origin unless you list extra origins with the <code>origin</code> parameter. Messages are never evaluated as code.</p>
+        <p>Two message shapes are accepted:</p>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>iframe.contentWindow.postMessage(
+  { type: 'luma', command: 'setPage', payload: { page: 4 } },
+  'https://your-domain.example'
+);
+
+// Legacy shorthand
+iframe.contentWindow.postMessage({ type: 'luma:setPage', page: 4 }, 'https://your-domain.example');</pre></div>
+        <table>
+          <thead><tr><th>Command</th><th>Payload</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td><code>setPage</code></td><td><code>{ page }</code></td><td><code>{ page }</code></td></tr>
+            <tr><td><code>setZoom</code></td><td><code>{ zoom }</code></td><td><code>{ zoom }</code> percent</td></tr>
+            <tr><td><code>nextPage</code> / <code>previousPage</code></td><td>—</td><td><code>{ page }</code></td></tr>
+            <tr><td><code>searchText</code></td><td><code>{ text }</code></td><td><code>{ term }</code>, then a <code>luma:searchCompleted</code> event</td></tr>
+            <tr><td><code>print</code></td><td>—</td><td><code>{ ok }</code></td></tr>
+            <tr><td><code>download</code></td><td>—</td><td><code>{ ok }</code></td></tr>
+            <tr><td><code>toggleSidebar</code></td><td>—</td><td><code>{ sidebar }</code></td></tr>
+            <tr><td><code>toggleFullscreen</code></td><td>—</td><td><code>{ fullscreen }</code></td></tr>
+            <tr><td><code>getDocumentInfo</code></td><td>—</td><td><code>{ pages, page, title, author, … }</code></td></tr>
+            <tr><td><code>setTheme</code></td><td><code>{ theme }</code></td><td><code>{ theme }</code></td></tr>
+            <tr><td><code>open</code></td><td><code>{ url }</code></td><td>Loads another PDF in the same frame</td></tr>
+          </tbody>
+        </table>
+        <p>Every command answers with <code>{ type: 'luma:response', command, ok, result | error }</code>.</p>
+
+        <h2 id="events">Viewer events</h2>
+        <p>The embed posts these to the parent window:</p>
+        <table>
+          <thead><tr><th>Event</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td><code>luma:ready</code></td><td><code>{ version, config }</code> — frame is listening, commands can be queued</td></tr>
+            <tr><td><code>luma:loaded</code></td><td><code>{ pages, page, title, author, … }</code></td></tr>
+            <tr><td><code>luma:error</code></td><td><code>{ code, message }</code> — <code>NETWORK_CORS</code>, <code>PASSWORD_REQUIRED</code>, <code>INVALID_PDF</code>, <code>NOT_PDF</code></td></tr>
+            <tr><td><code>luma:pageChanged</code></td><td><code>{ page, total }</code></td></tr>
+            <tr><td><code>luma:zoomChanged</code></td><td><code>{ percent, scale }</code></td></tr>
+            <tr><td><code>luma:searchCompleted</code></td><td><code>{ term, matches, page }</code></td></tr>
+            <tr><td><code>luma:fullscreenChanged</code></td><td><code>{ fullscreen }</code></td></tr>
+            <tr><td><code>luma:annotationChanged</code></td><td><code>{ count }</code></td></tr>
+            <tr><td><code>luma:documentInfo</code></td><td>Document metadata after a <code>getDocumentInfo</code> request</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="sdk">Parent-side helper</h2>
+        <p><code>js/embed/api.js</code> wraps the protocol if you prefer methods and promises:</p>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>&lt;iframe id="pdf" src="/embed.html?file=/report.pdf" width="100%" height="700" style="border:0"&gt;&lt;/iframe&gt;
+&lt;script type="module"&gt;
+  import { createLumaBridge } from './js/embed/api.js';
+
+  const luma = createLumaBridge(document.getElementById('pdf'), {
+    origin: location.origin
+  });
+
+  luma.on('luma:pageChanged', ({ page }) =&gt; console.log('page', page));
+  luma.on('luma:loaded', async () =&gt; {
+    const info = await luma.getDocumentInfo();
+    console.log(info.pages, 'pages');
+    luma.setPage(4);
+  });
+&lt;/script&gt;</pre></div>
+        <p>Available methods: <code>open</code>, <code>setPage</code>, <code>setZoom</code>, <code>nextPage</code>, <code>previousPage</code>, <code>search</code>, <code>print</code>, <code>download</code>, <code>toggleSidebar</code>, <code>toggleFullscreen</code>, <code>setTheme</code>, <code>getDocumentInfo</code>, <code>on</code>, <code>off</code>, <code>destroy</code>.</p>
+
+        <h2 id="deployment">Deployment</h2>
+        <p>The project is static. Copy the folder to any host that serves files over HTTPS.</p>
+        <h3>What the host must get right</h3>
+        <ul>
+          <li><code>.js</code> must be served as <code>text/javascript</code> (modules fail otherwise).</li>
+          <li>The PDF.js worker must be reachable at <code>vendor/pdfjs/pdf.worker.min.js</code>.</li>
+          <li><code>sw.js</code> must be served from the site root (or the sub-folder root) so its scope covers the app.</li>
+          <li>HTTPS is required for the service worker, installation and clipboard access.</li>
+        </ul>
+        <h3>Netlify</h3>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre># deployment/netlify.toml
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"</pre></div>
+        <h3>Vercel</h3>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "headers": [
+    { "source": "/(.*)", "headers": [{ "key": "X-Content-Type-Options", "value": "nosniff" }] }
+  ]
+}</pre></div>
+        <h3>Apache</h3>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>AddType text/javascript .js
+AddType application/pdf .pdf
+&lt;IfModule mod_headers.c&gt;
+  Header set X-Content-Type-Options "nosniff"
+&lt;/IfModule&gt;</pre></div>
+        <h3>Nginx</h3>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>types { text/javascript js mjs; application/pdf pdf; }
+location / { try_files $uri $uri/ /index.html; }
+location = /sw.js { add_header Cache-Control "no-cache"; }</pre></div>
+        <p>The app uses plain file names (<code>viewer.html</code>, <code>embed.html</code>), so no SPA rewrite rules are required. If you enable clean URLs, keep the <code>.html</code> fallback working.</p>
+
+        <h2 id="cors">CORS &amp; remote PDFs</h2>
+        <p>A browser will not let JavaScript read a file from another origin unless that server opts in. PDF.js fetches bytes (and uses HTTP Range requests when available), so the PDF host must send:</p>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>Access-Control-Allow-Origin: https://your-domain.example
+Access-Control-Allow-Headers: Range
+Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre></div>
+        <p>If you control neither the host nor the headers, these alternatives work:</p>
+        <ul>
+          <li>Download the PDF and open it from your device (no network involved).</li>
+          <li>Host a copy yourself, or serve it through your own domain.</li>
+          <li>Ask the publisher to enable CORS for PDF responses.</li>
+        </ul>
+        <div class="note warn">Luma PDF deliberately ships <strong>no public CORS proxy</strong>. Proxies of that kind break origin security for everyone and are routinely abused.</div>
+
+        <h2 id="security">Security</h2>
+        <ul>
+          <li>PDF content is parsed by PDF.js with <code>isEvalSupported: false</code>; embedded JavaScript in a PDF is never executed.</li>
+          <li>postMessage handlers accept only known commands, only from the parent window, and only from permitted origins.</li>
+          <li>Received payloads are reduced to primitives and never evaluated.</li>
+          <li>User text is inserted with <code>textContent</code> or escaped before templating; URLs are validated against an http(s) allow-list.</li>
+          <li>No analytics, no third-party requests, no hidden uploads.</li>
+        </ul>
+        <p>A reasonable CSP for the app (adjust for your host):</p>
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' 'wasm-unsafe-eval';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob:;
+  font-src 'self' data:;
+  connect-src 'self' https: blob:;
+  frame-src 'self' https:;
+  worker-src 'self' blob:;
+  object-src 'none';
+  base-uri 'none'</pre></div>
+        <p><code>'unsafe-inline'</code> in <code>style-src</code> is needed because the viewer positions text spans and annotation nodes with inline styles.</p>
+
+        <h2 id="performance">Performance</h2>
+        <p>Three profiles cap rendering cost; the app picks one from <code>navigator.deviceMemory</code>, <code>hardwareConcurrency</code>, connection type and pixel ratio, and you can force one in <a href="settings.html">Settings</a>.</p>
+        <table>
+          <thead><tr><th>Profile</th><th>Canvas budget</th><th>DPR cap</th><th>Concurrent renders</th><th>Cached pages</th></tr></thead>
+          <tbody>
+            <tr><td>Eco</td><td>1.6 MP</td><td>1.0</td><td>1</td><td>2</td></tr>
+            <tr><td>Balanced</td><td>4.2 MP</td><td>1.5</td><td>2</td><td>4</td></tr>
+            <tr><td>Performance</td><td>12 MP</td><td>2.0</td><td>3</td><td>8</td></tr>
+          </tbody>
+        </table>
+        <p>Only visible pages (plus a small margin) are rendered; off-screen canvases are released, and thumbnails reuse the on-screen bitmap when possible. Page sizes are measured after the first paint, so a 500-page document opens as fast as a 5-page one.</p>
+
+        <h2 id="testing">Testing</h2>
+        <p>A manual checklist that matches what was verified during development:</p>
+        <ul>
+          <li>Open a local PDF, a same-origin URL and a cross-origin URL that allows CORS.</li>
+          <li>Trigger a CORS failure on purpose: the viewer must explain it and offer retry.</li>
+          <li>Search for a word present on several pages; step through matches with Enter and Shift+Enter.</li>
+          <li>Zoom to 400%, switch to spread and book mode, rotate, then return to fit width.</li>
+          <li>Highlight text, draw with the pen, add a note, then export the annotated copy and reopen it.</li>
+          <li>Run Merge, Split, Rotate, Watermark and Compress on the same file and open every output.</li>
+          <li>In the embed: toggle the sidebar, change theme, and drive it with <code>setPage</code> from the parent.</li>
+          <li>Install the PWA, go offline, and reopen a saved document from the Library.</li>
+          <li>Resize from 320 px to 1920 px: no horizontal scrolling, no clipped toolbars.</li>
+        </ul>
+
+        <h2 id="limits">Limitations</h2>
+        <ul>
+          <li><strong>Encrypted PDFs</strong> can be read with a password, but the editing tools refuse them.</li>
+          <li><strong>Signed PDFs</strong> lose their signature validity when re-saved.</li>
+          <li><strong>OCR</strong> is not bundled: the OCR path is an optional add-on and scanned pages have no text layer without it.</li>
+          <li><strong>Compression</strong> re-renders pages as images, so text stops being selectable.</li>
+          <li><strong>Huge files</strong> (hundreds of megabytes) are limited by browser memory, not by the app.</li>
+          <li><strong>Digital signatures</strong> are drawn images, not cryptographic signatures.</li>
+        </ul>
+        <p class="muted small" style="margin-top:28px">Luma PDF v1.0.0 · PDF.js and pdf-lib are used under their respective licences.</p>
+      </article>
+    </div>
+  </div>
+</main>
+
+<footer data-shell="footer"></footer>
+<div class="toast-host" aria-live="polite"></div>
+
+<script type="module" src="js/pages/docs.js?v=1.0.0"></script>
+</body>
+</html>

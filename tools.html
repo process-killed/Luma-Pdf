@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PDF Tools — Luma PDF</title>
+<meta name="description" content="33 PDF utilities that run in your browser: merge, split, compress, convert, watermark, number pages, inspect metadata. Nothing is uploaded.">
+<meta name="theme-color" content="#fcfcfd">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css?v=1.0.0">
+<link rel="stylesheet" href="css/reset.css?v=1.0.0">
+<link rel="stylesheet" href="css/themes.css?v=1.0.0">
+<link rel="stylesheet" href="css/main.css?v=1.0.0">
+<link rel="stylesheet" href="css/layout.css?v=1.0.0">
+<link rel="stylesheet" href="css/homepage.css?v=1.0.0">
+<link rel="stylesheet" href="css/tools.css?v=1.0.0">
+<link rel="stylesheet" href="css/animations.css?v=1.0.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.0.0">
+<script>
+  try {
+    var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
+    var mode = s.theme || 'auto';
+    var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) {}
+</script>
+</head>
+<body class="view-app">
+<a class="skip-link" href="#main">Skip to content</a>
+<header data-shell="header"></header>
+
+<main id="main">
+  <section id="tools-catalog">
+    <div class="page-head">
+      <div class="container">
+        <span class="eyebrow">PDF tools</span>
+        <h1>Every PDF job, without an upload</h1>
+        <p><span id="tool-count">33</span> utilities that run entirely in this tab. Pick a tool, choose your file, and download the result — the original stays exactly where it is.</p>
+        <div class="tool-filter" style="margin-top:20px">
+          <div class="input-group grow" style="max-width:420px">
+            <input class="input" id="tool-filter" type="search" placeholder="Search tools — merge, split, compress…" aria-label="Search tools">
+          </div>
+          <a class="btn btn-outline" href="editor.html">Open the page editor</a>
+        </div>
+      </div>
+    </div>
+    <div class="container section-tight" id="tools-grid"></div>
+  </section>
+
+  <section id="tool-runner" hidden>
+    <div class="container section-tight"></div>
+  </section>
+</main>
+
+<footer data-shell="footer"></footer>
+<div class="toast-host" aria-live="polite"></div>
+
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script src="vendor/pdf-lib/pdf-lib.min.js"></script>
+<script type="module" src="js/pages/tools.js?v=1.0.0"></script>
+</body>
+</html>

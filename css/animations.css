@@ -1,0 +1,18 @@
+/* Shared motion utilities */
+.fade-in { animation: luma-fade-up var(--dur-3) var(--ease-out) both; }
+@keyframes luma-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.stagger > * { animation: luma-fade-up var(--dur-3) var(--ease-out) both; }
+.stagger > *:nth-child(1) { animation-delay: 20ms; }
+.stagger > *:nth-child(2) { animation-delay: 55ms; }
+.stagger > *:nth-child(3) { animation-delay: 90ms; }
+.stagger > *:nth-child(4) { animation-delay: 125ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 195ms; }
+.stagger > *:nth-child(7) { animation-delay: 230ms; }
+.stagger > *:nth-child(8) { animation-delay: 265ms; }
+.press { transition: transform var(--dur-1) var(--ease-out); }
+.press:active { transform: scale(.97); }
+:root[data-performance="eco"] .stagger > * { animation: none; }
+:root[data-performance="eco"] .hero::before { filter: none; opacity: .5; }
+:root[data-performance="eco"] .btn, :root[data-performance="eco"] .tool-tile, :root[data-performance="eco"] .feature-card { transition-duration: 0ms; }
+:root[data-performance="eco"] .page-wrap.rendered .page-canvas { animation: none; }

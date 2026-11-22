@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Luma PDF — a universal PDF workspace in your browser</title>
+<meta name="description" content="Open, read, annotate, edit, convert and embed PDFs entirely in your browser. No account, no uploads, no server. Installable PWA, fast on low-end devices.">
+<meta name="theme-color" content="#fcfcfd">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="stylesheet" href="css/tokens.css?v=1.0.0">
+<link rel="stylesheet" href="css/reset.css?v=1.0.0">
+<link rel="stylesheet" href="css/themes.css?v=1.0.0">
+<link rel="stylesheet" href="css/main.css?v=1.0.0">
+<link rel="stylesheet" href="css/layout.css?v=1.0.0">
+<link rel="stylesheet" href="css/homepage.css?v=1.0.0">
+<link rel="stylesheet" href="css/animations.css?v=1.0.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.0.0">
+<script>
+  // Apply the saved theme before first paint to avoid a flash.
+  try {
+    var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
+    var mode = s.theme || 'auto';
+    var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    if (s.readBg) document.documentElement.dataset.readbg = s.readBg;
+    if (s.pageFilter) document.documentElement.dataset.pagefilter = s.pageFilter;
+  } catch (e) {}
+</script>
+</head>
+<body class="view-app">
+<a class="skip-link" href="#main">Skip to content</a>
+<header data-shell="header"></header>
+
+<main id="main">
+  <section class="hero">
+    <div class="container hero-inner">
+      <div>
+        <span class="eyebrow">Universal PDF workspace</span>
+        <h1>Every PDF,<br><span class="grad">handled in your browser.</span></h1>
+        <p class="hero-lede">
+          Read, search, annotate, edit, convert and embed PDFs without uploading a single byte.
+          Luma PDF runs on the device in front of you — and keeps working when the network doesn't.
+        </p>
+        <div class="hero-points">
+          <span class="hero-point"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>No uploads, no account</span>
+          <span class="hero-point"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Works offline</span>
+          <span class="hero-point"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>Tuned for 3&nbsp;GB devices</span>
+        </div>
+        <div class="row" style="margin-top:26px;gap:10px;flex-wrap:wrap">
+          <a class="btn btn-primary btn-lg" href="viewer.html">Open the viewer</a>
+          <a class="btn btn-outline btn-lg" href="embed-generator.html">Embed a PDF</a>
+        </div>
+      </div>
+
+      <div class="open-card" id="open-card">
+        <div class="dropzone" id="home-dropzone" role="button" tabindex="0" aria-label="Upload a PDF from your device">
+          <input type="file" accept="application/pdf,.pdf" aria-label="Choose a PDF file" aria-hidden="true" tabindex="-1">
+          <span class="dz-icon">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </span>
+          <span class="dz-title">Drop a PDF, or click to browse</span>
+          <span class="dz-sub">Files stay on this device · up to 400&nbsp;MB</span>
+        </div>
+
+        <div class="or">or open from a link</div>
+        <form class="input-group" id="url-form">
+          <input class="input" type="url" id="url-input" placeholder="https://example.com/document.pdf"
+                 aria-label="PDF URL" autocomplete="off" spellcheck="false">
+          <button class="btn btn-primary" type="submit">Open</button>
+        </form>
+        <p class="hint" style="margin-top:8px">
+          The server hosting the PDF must allow cross-origin reads (CORS). <a href="docs.html#cors">Why?</a>
+        </p>
+
+        <div class="recent" id="home-recent" hidden>
+          <div class="recent-head">
+            <span>Recently opened</span>
+            <a class="small" href="library.html">Library</a>
+          </div>
+          <div class="recent-list" id="home-recent-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Quick tools</span>
+        <h2>Thirty-three PDF utilities, zero uploads</h2>
+        <p>Every tool runs locally with pdf-lib and PDF.js. Pick one and it works on the file you choose — nothing is transmitted.</p>
+      </div>
+      <div class="grid grid-4 stagger" id="quick-tools"></div>
+      <div class="row" style="margin-top:20px">
+        <a class="btn btn-outline" href="tools.html">All PDF tools</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Built like a product</span>
+        <h2>Professional reading, real editing</h2>
+        <p>Not a PDF.js demo: a full workspace with annotation, page organisation, conversion and export.</p>
+      </div>
+      <div class="grid grid-3 stagger">
+        <article class="feature-card">
+          <div class="fc-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+          <h3>Nine reading layouts</h3>
+          <p>Single page, continuous, horizontal, two-page spread, book mode, RTL, presentation, fullscreen and distraction-free.</p>
+        </article>
+        <article class="feature-card">
+          <div class="fc-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+          <h3>Whole-document search</h3>
+          <p>Indexes every page's real text layer, highlights hits on the page, and jumps between matches with a keyboard shortcut.</p>
+        </article>
+        <article class="feature-card">
+          <div class="fc-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg></div>
+          <h3>Annotations that export</h3>
+          <p>Highlight, ink, shapes, notes and signatures — kept in the viewer, then written into a new PDF with pdf-lib on demand.</p>
+        </article>
+        <article class="feature-card">
+          <div class="fc-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+          <h3>Page organiser</h3>
+          <p>Reorder by drag, rotate, duplicate, delete and extract pages, then export the result as a fresh document.</p>
+        </article>
+        <article class="feature-card">
+          <div class="fc-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+          <h3>Embeddable everywhere</h3>
+          <p>One iframe URL with 26 parameters, a generator with live preview, and a postMessage API with strict origin checks.</p>
+        </article>
+        <article class="feature-card">
+          <div class="fc-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg></div>
+          <h3>Adaptive performance</h3>
+          <p>Eco, Balanced and Performance profiles cap canvas pixels, limit concurrent renders and release memory as you scroll.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight">
+    <div class="container">
+      <div class="band">
+        <div>
+          <span class="eyebrow">For developers</span>
+          <h2>Your PDFs, in your site, in one line</h2>
+          <p>Point an iframe at Luma PDF, choose the chrome you want, and copy the snippet. No SDK to install, no API key, no build step.</p>
+          <div class="row" style="margin-top:18px;gap:10px;flex-wrap:wrap">
+            <a class="btn btn-primary" href="embed-generator.html">Open the Embed Generator</a>
+            <a class="btn btn-outline" href="docs.html#api">Read the API</a>
+          </div>
+        </div>
+        <div class="band-code"><span class="tok-tag">&lt;iframe</span>
+  <span class="tok-attr">src</span>=<span class="tok-str">"embed.html?file=/report.pdf&amp;theme=dark&amp;page=1"</span>
+  <span class="tok-attr">width</span>=<span class="tok-str">"100%"</span> <span class="tok-attr">height</span>=<span class="tok-str">"700"</span>
+  <span class="tok-attr">style</span>=<span class="tok-str">"border:0"</span> <span class="tok-attr">loading</span>=<span class="tok-str">"lazy"</span>
+  <span class="tok-attr">allowfullscreen</span>
+  <span class="tok-attr">title</span>=<span class="tok-str">"Luma PDF Viewer"</span><span class="tok-tag">&gt;&lt;/iframe&gt;</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight">
+    <div class="container">
+      <div class="grid grid-2" style="align-items:center;gap:32px">
+        <div>
+          <span class="eyebrow">Privacy by architecture</span>
+          <h2 style="font-size:30px">Your documents never leave the device</h2>
+          <p style="color:var(--text-secondary);margin-top:12px">
+            There is no backend to send files to. PDFs you open are decoded in memory, and only documents you
+            explicitly save are kept in this browser's IndexedDB — delete them any time from the Library.
+          </p>
+          <ul class="col" style="margin-top:18px;gap:10px;font-size:14px;color:var(--text-secondary)">
+            <li class="row" style="gap:9px"><span style="color:var(--success)">✓</span> No accounts, no analytics of document content</li>
+            <li class="row" style="gap:9px"><span style="color:var(--success)">✓</span> No hidden uploads or cloud sync</li>
+            <li class="row" style="gap:9px"><span style="color:var(--success)">✓</span> Remote PDFs load only from servers that allow it</li>
+            <li class="row" style="gap:9px"><span style="color:var(--success)">✓</span> PDFs never run JavaScript inside the viewer</li>
+          </ul>
+        </div>
+        <div class="card card-pad">
+          <h3 style="font-size:16px;margin-bottom:10px">Install it as an app</h3>
+          <p class="small" style="color:var(--text-secondary);line-height:1.6">
+            Add Luma PDF to your home screen or desktop. Saved documents open offline, and the interface shell
+            is cached by a service worker.
+          </p>
+          <div class="row" style="margin-top:16px;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" data-install-app>Install Luma PDF</button>
+            <a class="btn btn-ghost" href="library.html">Open library</a>
+          </div>
+          <p class="hint" style="margin-top:12px">
+            Android and desktop browsers show an install prompt; on iOS use Safari's Share → Add to Home Screen.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer data-shell="footer"></footer>
+<div class="toast-host" aria-live="polite"></div>
+
+<script type="module" src="js/pages/home.js?v=1.0.0"></script>
+</body>
+</html>

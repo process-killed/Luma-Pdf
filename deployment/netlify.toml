@@ -1,0 +1,29 @@
+# Luma PDF — Netlify configuration
+[build]
+  publish = "."
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    X-Frame-Options = "SAMEORIGIN"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/vendor/pdfjs/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The app uses explicit .html files, so no SPA rewrite is required.
+# Uncomment the block below only if you want clean URLs.
+# [[redirects]]
+#   from = "/viewer"
+#   to = "/viewer.html"
+#   status = 200

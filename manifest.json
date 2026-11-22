@@ -1,0 +1,31 @@
+{
+  "name": "Luma PDF",
+  "short_name": "Luma PDF",
+  "description": "Open, read, annotate, edit, convert and embed PDFs entirely in your browser. No uploads, no account.",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#fcfcfd",
+  "theme_color": "#6e56cf",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities", "business"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Open the viewer", "url": "./viewer.html", "description": "Open a PDF from this device or a link" },
+    { "name": "PDF tools", "url": "./tools.html", "description": "Merge, split, convert and optimise PDFs" },
+    { "name": "Embed generator", "url": "./embed-generator.html", "description": "Build an embeddable PDF viewer" }
+  ],
+  "file_handlers": [
+    { "action": "./viewer.html", "accept": { "application/pdf": [".pdf"] } }
+  ],
+  "prefer_related_applications": false
+}

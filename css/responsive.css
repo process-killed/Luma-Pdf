@@ -1,0 +1,46 @@
+/* Cross-cutting responsive rules */
+@media (max-width: 1024px) {
+  :root { --content-max: 100%; }
+}
+@media (max-width: 860px) {
+  :root { --header-h: 56px; }
+  .site-header .container { gap: var(--sp-3); }
+  .brand-sub { display: none; }
+  .header-actions .hide-sm { display: none; }
+}
+@media (max-width: 640px) {
+  :root { --fs-3xl: 26px; --fs-4xl: 32px; }
+  .btn { height: 36px; }
+  .btn-lg { height: 44px; }
+  .page-head { padding: var(--sp-6) 0 var(--sp-4); }
+  .modal-body { max-height: 66vh; }
+  dialog.modal { width: 100vw; max-width: 100vw; border-radius: var(--r-xl) var(--r-xl) 0 0; margin: auto auto 0; max-height: 92vh; }
+  dialog.modal[open] { animation: luma-sheet-up var(--dur-3) var(--ease-out); }
+  @keyframes luma-sheet-up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+  .modal-foot { border-radius: 0; }
+}
+@media (max-width: 400px) {
+  .container { padding: 0 12px; }
+  .hero-points { gap: 6px 10px; }
+}
+/* Ultrawide: keep text readable */
+@media (min-width: 1900px) {
+  :root { --content-max: 1320px; }
+}
+/* Print */
+@media print {
+  .site-header, .site-footer, .viewer-toolbar, .sidebar, .mobile-bar, .annot-bar, .toast-host { display: none !important; }
+  .workspace { background: #fff !important; overflow: visible !important; }
+  .page-wrap { box-shadow: none !important; page-break-after: always; }
+}
+/* Touch devices: bigger targets */
+@media (hover: none) {
+  .tb-btn { min-width: 38px; height: 36px; }
+  .menu-item { padding: 10px; }
+  .side-item { padding: 10px; }
+  .thumb { padding: 6px; }
+}
+/* Safe area */
+@supports (padding: max(0px)) {
+  .site-header { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+}

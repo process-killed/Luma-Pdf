@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Local library — Luma PDF</title>
+<meta name="description" content="Your PDFs, stored only in this browser. Open them offline, rename, favourite or delete them.">
+<meta name="theme-color" content="#fcfcfd">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css?v=1.0.0">
+<link rel="stylesheet" href="css/reset.css?v=1.0.0">
+<link rel="stylesheet" href="css/themes.css?v=1.0.0">
+<link rel="stylesheet" href="css/main.css?v=1.0.0">
+<link rel="stylesheet" href="css/layout.css?v=1.0.0">
+<link rel="stylesheet" href="css/homepage.css?v=1.0.0">
+<link rel="stylesheet" href="css/animations.css?v=1.0.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.0.0">
+<script>
+  try {
+    var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
+    var mode = s.theme || 'auto';
+    var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) {}
+</script>
+</head>
+<body class="view-app">
+<a class="skip-link" href="#main">Skip to content</a>
+<header data-shell="header"></header>
+
+<main id="main">
+  <div class="page-head">
+    <div class="container">
+      <span class="eyebrow">Local library</span>
+      <h1>Your documents, on this device only</h1>
+      <p>Saved PDFs live in this browser's IndexedDB. They open without a connection, and nothing is ever synced or uploaded.</p>
+    </div>
+  </div>
+
+  <div class="container section-tight">
+    <div class="grid grid-3" style="align-items:start;gap:16px;margin-bottom:20px">
+      <div class="card card-pad">
+        <div class="small muted">Documents</div>
+        <div style="font-size:26px;font-weight:640;letter-spacing:-.02em" id="stat-docs">0</div>
+      </div>
+      <div class="card card-pad">
+        <div class="small muted">Storage used</div>
+        <div style="font-size:26px;font-weight:640;letter-spacing:-.02em" id="stat-size">0 B</div>
+        <div class="progress" style="margin-top:8px"><i id="stat-bar" style="width:0%"></i></div>
+        <div class="hint" id="stat-quota" style="margin-top:6px"></div>
+      </div>
+      <div class="card card-pad">
+        <div class="small muted">Quick actions</div>
+        <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" id="lib-add">Open a PDF</button>
+          <a class="btn btn-outline btn-sm" href="settings.html">Storage settings</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row-between" style="margin-bottom:12px;flex-wrap:wrap;gap:10px">
+      <div class="input-group" style="max-width:340px;flex:1">
+        <input class="input" id="lib-search" type="search" placeholder="Search your documents…" aria-label="Search documents">
+      </div>
+      <div class="segmented" role="group" aria-label="Filter">
+        <button data-filter="all" aria-pressed="true">All</button>
+        <button data-filter="favorites" aria-pressed="false">Favourites</button>
+      </div>
+    </div>
+
+    <div id="lib-list" class="stack-4"></div>
+  </div>
+</main>
+
+<footer data-shell="footer"></footer>
+<input type="file" id="lib-file" accept="application/pdf,.pdf" hidden>
+<div class="toast-host" aria-live="polite"></div>
+
+<script type="module" src="js/pages/library.js?v=1.0.0"></script>
+</body>
+</html>

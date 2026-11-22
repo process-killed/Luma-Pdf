@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Embed Generator — Luma PDF</title>
+<meta name="description" content="Build an embeddable PDF viewer: pick the chrome, theme, layout and permissions, preview it live, and copy the iframe snippet.">
+<meta name="theme-color" content="#fcfcfd">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css?v=1.0.0">
+<link rel="stylesheet" href="css/reset.css?v=1.0.0">
+<link rel="stylesheet" href="css/themes.css?v=1.0.0">
+<link rel="stylesheet" href="css/main.css?v=1.0.0">
+<link rel="stylesheet" href="css/layout.css?v=1.0.0">
+<link rel="stylesheet" href="css/tools.css?v=1.0.0">
+<link rel="stylesheet" href="css/embed.css?v=1.0.0">
+<link rel="stylesheet" href="css/animations.css?v=1.0.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.0.0">
+<script>
+  try {
+    var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
+    var mode = s.theme || 'auto';
+    var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) {}
+</script>
+</head>
+<body class="view-app">
+<a class="skip-link" href="#main">Skip to content</a>
+<header data-shell="header"></header>
+
+<main id="main">
+  <div class="page-head">
+    <div class="container">
+      <span class="eyebrow">For developers</span>
+      <h1>Embed a PDF in one iframe</h1>
+      <p>Point Luma PDF at a PDF URL, choose which controls to expose, and copy the snippet. No SDK, no build step, no API key.</p>
+    </div>
+  </div>
+
+  <div class="container section-tight">
+    <div class="gen-grid">
+      <div class="stack-4">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Source</span></div>
+          <div class="panel-body stack-4">
+            <div class="field">
+              <label class="label" for="gen-file">PDF URL</label>
+              <input class="input" id="gen-file" type="url" placeholder="https://example.com/report.pdf" spellcheck="false">
+              <span class="hint">Absolute http(s) URL. The server must allow cross-origin reads.</span>
+            </div>
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" id="gen-apply">Update preview</button>
+              <button class="btn btn-outline btn-sm" id="gen-open">Open standalone</button>
+              <button class="btn btn-ghost btn-sm" id="gen-reset">Reset</button>
+            </div>
+            <div class="small" id="gen-status"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Presets</span></div>
+          <div class="panel-body">
+            <div class="gen-presets" id="gen-presets"></div>
+          </div>
+        </div>
+
+        <div id="gen-controls" class="stack-4"></div>
+      </div>
+
+      <div class="gen-preview">
+        <div class="gen-frame" id="gen-frame"></div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Embed URL</span>
+            <button class="btn btn-ghost btn-sm" data-copy="#gen-url">Copy</button>
+          </div>
+          <div class="panel-body">
+            <code id="gen-url" class="mono small" style="word-break:break-all;color:var(--text-secondary)"></code>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">iframe snippet</span>
+            <div class="row" style="gap:6px">
+              <select class="select input-sm" id="gen-snippet-style" style="height:30px;font-size:12px;padding:0 26px 0 8px;width:auto" aria-label="Snippet style">
+                <option value="responsive">Responsive</option>
+                <option value="fixed">Fixed size</option>
+                <option value="fullscreen">Fullscreen</option>
+                <option value="minimal">Minimal height</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" data-copy="#gen-code">Copy</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="codeblock" style="margin:0">
+              <pre id="gen-code" style="max-height:190px"></pre>
+            </div>
+            <p class="hint" style="margin-top:10px">Add <code>allowfullscreen</code> so readers can go fullscreen, and keep the <code>title</code> attribute for screen readers.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-body">
+            <p class="small muted" style="line-height:1.6">
+              Need to drive the viewer from JavaScript? Every embed answers <code>postMessage</code> commands such as
+              <code>setPage</code>, <code>setZoom</code> and <code>searchText</code>.
+              <a href="docs.html#api">Read the API</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer data-shell="footer"></footer>
+<div class="toast-host" aria-live="polite"></div>
+
+<script type="module" src="js/pages/embed-generator.js?v=1.0.0"></script>
+</body>
+</html>

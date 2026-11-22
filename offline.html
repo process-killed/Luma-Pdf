@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline — Luma PDF</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/reset.css">
+<link rel="stylesheet" href="css/themes.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/layout.css">
+<style>
+  .offline-wrap { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+  .offline-card { max-width: 440px; text-align: center; }
+  .offline-card h1 { font-size: 26px; margin: 18px 0 8px; }
+  .offline-card p { color: var(--text-secondary); font-size: 14px; line-height: 1.65; }
+</style>
+</head>
+<body>
+<div class="offline-wrap">
+  <div class="offline-card">
+    <div style="display:flex;justify-content:center">
+      <svg class="brand-mark" style="width:52px;height:52px" viewBox="0 0 32 32" aria-hidden="true">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8a6ee8"/><stop offset="0.55" stop-color="#6e56cf"/><stop offset="1" stop-color="#e8a94a"/></linearGradient></defs>
+        <rect width="32" height="32" rx="8.5" fill="url(#g)"/>
+        <path d="M10.6 8h6.9l4.9 4.8V23a1.4 1.4 0 0 1-1.4 1.4H10.6A1.4 1.4 0 0 1 9.2 23V9.4A1.4 1.4 0 0 1 10.6 8z" fill="#fff" fill-opacity=".96"/>
+      </svg>
+    </div>
+    <h1>You are offline</h1>
+    <p>This page was not cached. Documents you saved in the Library still open without a connection — everything else needs the network once.</p>
+    <div style="margin-top:20px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <a class="btn btn-primary" href="library.html">Open my library</a>
+      <button class="btn btn-outline" onclick="location.reload()">Try again</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
