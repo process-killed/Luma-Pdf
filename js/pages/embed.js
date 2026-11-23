@@ -12,6 +12,7 @@ import { KeyController } from '../viewer/keyboard.js';
 import { parseEmbedConfig } from '../embed/config.js';
 import { EmbedBridge, allowedOriginsFromParams } from '../embed/messaging.js';
 import { parseBool } from '../utils/urls.js';
+import { APP } from '../config.js';
 import { icon } from '../ui/icons.js';
 import { initMenus } from '../ui/ui.js';
 import { applyTheme } from '../theme.js';
@@ -70,7 +71,7 @@ function main() {
 function ready() {
   // Announce readiness even before a document loads, so parents can queue commands.
   setTimeout(() => {
-    S.bridge?.emit('luma:ready', { version: '1.0.0', config: publicConfig() });
+    S.bridge?.emit('luma:ready', { version: APP.version, config: publicConfig() });
   }, 30);
 }
 
@@ -179,6 +180,7 @@ async function loadDocument() {
       S.annots = new AnnotationManager({ viewer: S.viewer, onChange: () => S.bridge?.emit('luma:annotationChanged', { count: S.annots.items.length }) });
       S.annots.attach();
       S.annots.enableSelectInteractions();
+      S.annots.syncZoom();
     }
 
     if (config.sidebar) {
@@ -263,7 +265,11 @@ function onViewerEvent(type, detail) {
     S.bridge?.emit('luma:pageChanged', { page: detail.page, total: detail.total });
   } else if (type === 'zoomChanged') {
     S.toolbar?.setZoom(detail.percent);
+    S.annots?.syncZoom();
     S.bridge?.emit('luma:zoomChanged', { percent: detail.percent, scale: detail.scale });
+  } else if (type === 'zoomSettled') {
+    S.annots?.syncZoom();
+    S.search?.refresh();
   } else if (type === 'modeChanged') {
     S.toolbar?.setMode(detail.mode);
   }
@@ -272,8 +278,7 @@ function onViewerEvent(type, detail) {
 function syncZoom() {
   if (!S.viewer) return;
   S.toolbar?.setZoom(Math.round(S.viewer.scale * 100));
-  S.search?.refresh();
-  S.annots?.renderAll();
+  S.annots?.syncZoom();
 }
 
 function runSearch(term) {

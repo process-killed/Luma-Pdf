@@ -1,7 +1,15 @@
 /**
  * Annotation system — viewer-side annotations that can be written into a new PDF.
- * Geometry is stored in page units (CSS px at 100% zoom, origin top-left) so it is
- * independent of the current zoom and converts 1:1 to PDF points on export.
+ *
+ * Coordinates are page units (CSS px at 100% zoom, origin top-left), so they convert
+ * 1:1 to PDF points on export. The whole layer is scaled with one CSS transform, which
+ * means zooming never rebuilds annotation DOM and never loses a stroke.
+ *
+ * Interaction design:
+ *  - one draft element per gesture, updated in place (no node churn per pointermove);
+ *  - the layer rect is measured once per gesture, not on every move;
+ *  - selection toggles attributes instead of re-rendering the page;
+ *  - ink strokes are smoothed with quadratic curves.
  */
 import { uid } from '../utils/files.js';
 import { toast } from '../ui/ui.js';
@@ -26,8 +34,9 @@ export class AnnotationManager {
     this.undoStack = [];
     this.redoStack = [];
     this.attached = new WeakSet();
-    this._bound = false;
     this._draft = null;
+    this._gesture = null;
+    this._raf = 0;
   }
 
   /* ---------- state ---------- */
@@ -36,10 +45,10 @@ export class AnnotationManager {
     this.select(null);
     this.viewer.pages.forEach((pv) => {
       if (!pv.annotEl) return;
-      pv.annotEl.dataset.mode = INK_TYPES.has(tool) || DRAG_TYPES.has(tool) ? 'draw' : tool === 'text' ? 'text' : 'select';
+      pv.annotEl.dataset.mode = INK_TYPES.has(tool) || DRAG_TYPES.has(tool) ? 'draw'
+        : CLICK_TYPES.has(tool) ? 'click' : 'select';
       pv.annotEl.dataset.selectable = tool === 'select' ? 'true' : 'false';
     });
-    if (tool === 'text' || tool === 'note') this.viewer.pages.forEach((pv) => { if (pv.annotEl) pv.annotEl.dataset.mode = 'text'; });
   }
 
   setColor(color) { this.color = color; this.applyToSelected({ color }); }
@@ -53,7 +62,7 @@ export class AnnotationManager {
     if (!item) return;
     Object.assign(item, patch);
     this.renderPage(item.page);
-    this.commit('Style changed');
+    this.commit();
   }
 
   snapshot() {
@@ -62,20 +71,14 @@ export class AnnotationManager {
     this.redoStack = [];
   }
 
-  commit(message) {
-    this.onChange(this.items);
-    this.viewer.pages.forEach((pv, i) => {
-      if (this.items.some((it) => it.page === i + 1)) this.renderPage(i + 1);
-    });
-    if (message) this.onSelect({ message });
-  }
+  commit() { this.onChange(this.items); }
 
   undo() {
     if (!this.undoStack.length) return false;
     this.redoStack.push(JSON.stringify(this.items));
     this.items = JSON.parse(this.undoStack.pop());
     this.renderAll();
-    this.onChange(this.items);
+    this.commit();
     return true;
   }
 
@@ -84,7 +87,7 @@ export class AnnotationManager {
     this.undoStack.push(JSON.stringify(this.items));
     this.items = JSON.parse(this.redoStack.pop());
     this.renderAll();
-    this.onChange(this.items);
+    this.commit();
     return true;
   }
 
@@ -104,15 +107,27 @@ export class AnnotationManager {
   clearPage(page) {
     this.snapshot();
     this.items = this.items.filter((i) => i.page !== page);
-    this.renderAll();
+    this.renderPage(page);
     this.commit();
   }
 
   countFor(page) { return this.items.filter((i) => i.page === page).length; }
 
   select(id) {
+    const prev = this.selectedId;
     this.selectedId = id;
-    this.renderAll();
+    if (prev && prev !== id) this.paintSelected(prev, false);
+    if (id) this.paintSelected(id, true);
+  }
+
+  paintSelected(id, on) {
+    this.viewer.pages.forEach((pv) => {
+      const node = pv.annotEl?.querySelector(`.annot-item[data-id="${id}"]`);
+      if (node) {
+        if (on) node.dataset.selected = 'true';
+        else node.removeAttribute('data-selected');
+      }
+    });
   }
 
   deleteSelected() {
@@ -126,15 +141,47 @@ export class AnnotationManager {
     return true;
   }
 
+  duplicateSelected() {
+    const item = this.items.find((i) => i.id === this.selectedId);
+    if (!item) return false;
+    this.snapshot();
+    const copy = { ...item, id: uid('ann'), x: (item.x || 0) + 12, y: (item.y || 0) + 12 };
+    if (item.points) copy.points = item.points.map((p) => ({ x: p.x + 12, y: p.y + 12 }));
+    if (item.from) copy.from = { x: item.from.x + 12, y: item.from.y + 12 };
+    if (item.to) copy.to = { x: item.to.x + 12, y: item.to.y + 12 };
+    this.items.push(copy);
+    this.renderPage(copy.page);
+    this.commit();
+    this.select(copy.id);
+    return true;
+  }
+
   /* ---------- layer wiring ---------- */
   attach() {
     this.viewer.pages.forEach((pv) => {
-      if (!pv.annotEl || this.attached.has(pv.annotEl)) return;
+      if (!pv.annotEl) return;
+      this.styleLayer(pv);
+      if (this.attached.has(pv.annotEl)) return;
       this.attached.add(pv.annotEl);
       this.wireLayer(pv);
     });
     this.setTool(this.tool);
     this.renderAll();
+  }
+
+  /** Keep the layer's transform in sync with the viewer zoom (one style write). */
+  syncZoom() {
+    this.viewer.pages.forEach((pv) => { if (pv.annotEl) this.styleLayer(pv); });
+  }
+
+  styleLayer(pv) {
+    const s = this.viewer.scale;
+    const el = pv.annotEl;
+    el.style.width = `${pv.baseSize.width}px`;
+    el.style.height = `${pv.baseSize.height}px`;
+    el.style.transform = `scale(${s})`;
+    el.style.transformOrigin = '0 0';
+    el.style.setProperty('--inv', String(1 / s));
   }
 
   wireLayer(pv) {
@@ -146,82 +193,225 @@ export class AnnotationManager {
   }
 
   localPoint(e, pv) {
-    const rect = pv.annotEl.getBoundingClientRect();
-    return { x: (e.clientX - rect.left) / this.viewer.scale, y: (e.clientY - rect.top) / this.viewer.scale };
+    const g = this._gesture;
+    const rect = g && g.pv === pv ? g.rect : pv.annotEl.getBoundingClientRect();
+    const scale = g && g.pv === pv ? g.scale : this.viewer.scale;
+    return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
   }
 
   onPointerDown(e, pv) {
     if (this.tool === 'select' || this.tool === 'pan' || this.tool === 'eraser') return;
     if (e.button !== undefined && e.button !== 0) return;
+
+    this._gesture = {
+      pv,
+      rect: pv.annotEl.getBoundingClientRect(),
+      scale: this.viewer.scale,
+      pointerId: e.pointerId
+    };
     const p = this.localPoint(e, pv);
-    layerCapture(e, pv.annotEl);
+    try { pv.annotEl.setPointerCapture(e.pointerId); } catch { /* ignore */ }
 
     if (DRAG_TYPES.has(this.tool)) {
-      this._draft = { page: pv.num, type: this.tool, start: p, current: p };
-      this.showDraft(pv);
+      this._draft = { page: pv.num, type: this.tool, start: p, current: p, node: null };
+      this.createDraft(pv);
+      e.preventDefault();
       return;
     }
     if (INK_TYPES.has(this.tool)) {
-      this._draft = { page: pv.num, type: this.tool, points: [p] };
-      this.showDraft(pv);
+      this._draft = { page: pv.num, type: this.tool, points: [p], node: null, path: null };
+      this.createDraft(pv);
+      this.updateInkDraft();
+      e.preventDefault();
       return;
     }
     if (CLICK_TYPES.has(this.tool)) {
-      // Prevent the browser's default focus handling from blurring the inline editor
-      // we are about to create.
       e.preventDefault();
       this.placeClickType(pv, p);
     }
   }
 
   onPointerMove(e, pv) {
-    if (!this._draft || this._draft.page !== pv.num) return;
+    const d = this._draft;
+    if (!d || d.page !== pv.num) return;
     const p = this.localPoint(e, pv);
-    if (INK_TYPES.has(this._draft.type)) this._draft.points.push(p);
-    else this._draft.current = p;
-    this.showDraft(pv);
+    if (INK_TYPES.has(d.type)) {
+      const last = d.points[d.points.length - 1];
+      if (Math.abs(p.x - last.x) + Math.abs(p.y - last.y) < 1.2) return;   // skip sub-pixel noise
+      d.points.push(p);
+      if (!this._raf) {
+        this._raf = requestAnimationFrame(() => {
+          this._raf = 0;
+          this.updateInkDraft();
+        });
+      }
+    } else {
+      d.current = p;
+      this.updateShapeDraft();
+    }
+    e.preventDefault();
   }
 
   onPointerUp(e, pv) {
-    if (!this._draft || this._draft.page !== pv.num) return;
-    const draft = this._draft;
+    const d = this._draft;
+    if (!d || d.page !== pv.num) { this._gesture = null; return; }
     this._draft = null;
-    this.clearDraft(pv);
+    this._gesture = null;
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = 0; }
+    d.node?.remove();
 
-    if (INK_TYPES.has(draft.type)) {
-      if (draft.points.length < 2) return;
+    if (INK_TYPES.has(d.type)) {
+      if (d.points.length < 2) return;
       this.snapshot();
       this.items.push({
-        id: uid('ann'), page: draft.page, type: draft.type,
-        points: draft.points.map((pt) => ({ x: round(pt.x), y: round(pt.y) })),
-        color: this.color, strokeWidth: draft.type === 'marker' ? this.strokeWidth * 4 : this.strokeWidth,
-        opacity: draft.type === 'marker' ? 0.4 : this.opacity
+        id: uid('ann'), page: d.page, type: d.type,
+        points: d.points.map((pt) => ({ x: round(pt.x), y: round(pt.y) })),
+        color: this.color,
+        strokeWidth: d.type === 'marker' ? this.strokeWidth * 4 : this.strokeWidth,
+        opacity: d.type === 'marker' ? 0.4 : this.opacity
       });
-      this.renderPage(draft.page);
+      this.renderPage(d.page);
       this.commit();
       return;
     }
 
-    const x = Math.min(draft.start.x, draft.current.x);
-    const y = Math.min(draft.start.y, draft.current.y);
-    const w = Math.abs(draft.current.x - draft.start.x);
-    const h = Math.abs(draft.current.y - draft.start.y);
-    if (w < 4 && h < 4) return;
+    // Text marks follow the real text lines, which is what readers expect from a
+    // highlight: drag across a sentence and the whole line gets marked, even if the
+    // gesture was perfectly flat.
+    if (d.type === 'highlight' || d.type === 'underline' || d.type === 'strike') {
+      const snapped = this.snapTextRects(pv, d.start, d.current);
+      if (snapped.length) {
+        this.snapshot();
+        snapped.forEach((r) => this.items.push({
+          id: uid('ann'), page: d.page, type: d.type,
+          x: round(r.x), y: round(r.y), w: round(r.w), h: round(r.h),
+          color: this.color,
+          strokeWidth: this.strokeWidth,
+          opacity: d.type === 'highlight' ? 0.35 : this.opacity
+        }));
+        this.renderPage(d.page);
+        this.commit();
+        return;
+      }
+    }
+
+    const x = Math.min(d.start.x, d.current.x);
+    const y = Math.min(d.start.y, d.current.y);
+    const w = Math.abs(d.current.x - d.start.x);
+    const hRaw = Math.abs(d.current.y - d.start.y);
+    if (w < 3 && hRaw < 3) return;
+    // A flat drag over a scanned page still produces a usable band.
+    const h = (d.type === 'highlight' || d.type === 'underline' || d.type === 'strike')
+      ? Math.max(hRaw, this.fontSize * 1.2)
+      : hRaw;
 
     this.snapshot();
     this.items.push({
-      id: uid('ann'), page: draft.page, type: draft.type,
+      id: uid('ann'), page: d.page, type: d.type,
       x: round(x), y: round(y), w: round(w), h: round(h),
       color: this.color,
       strokeWidth: this.strokeWidth,
-      opacity: draft.type === 'highlight' ? 0.35 : this.opacity,
-      from: draft.type === 'line' || draft.type === 'arrow' ? { x: round(draft.start.x), y: round(draft.start.y) } : undefined,
-      to: draft.type === 'line' || draft.type === 'arrow' ? { x: round(draft.current.x), y: round(draft.current.y) } : undefined
+      opacity: d.type === 'highlight' ? 0.35 : this.opacity,
+      from: (d.type === 'line' || d.type === 'arrow') ? { x: round(d.start.x), y: round(d.start.y) } : undefined,
+      to: (d.type === 'line' || d.type === 'arrow') ? { x: round(d.current.x), y: round(d.current.y) } : undefined
     });
-    this.renderPage(draft.page);
+    this.renderPage(d.page);
     this.commit();
   }
 
+  /**
+   * Collect the text spans under a drag and merge them into one rect per line.
+   * Returns page-unit rects, or [] when the area has no text layer (e.g. a scan).
+   */
+  snapTextRects(pv, start, current) {
+    const layer = pv.textLayerEl;
+    if (!layer || !layer.childElementCount) return [];
+    const s = this.viewer.scale;
+    const layerRect = pv.annotEl.getBoundingClientRect();
+    const x1 = Math.min(start.x, current.x) * s;
+    const x2 = Math.max(start.x, current.x) * s;
+    const y1 = Math.min(start.y, current.y) * s;
+    const y2 = Math.max(start.y, current.y) * s;
+    const flat = (y2 - y1) < 6;
+    const rows = flat ? [(y1 + y2) / 2] : [y1, (y1 + y2) / 2, y2];
+
+    const steps = Math.max(2, Math.min(30, Math.round((x2 - x1) / 20)));
+    const found = new Map();
+    for (let i = 0; i <= steps; i++) {
+      const cx = layerRect.left + x1 + ((x2 - x1) * i) / steps;
+      for (const cy of rows) {
+        const stack = document.elementsFromPoint(cx, layerRect.top + cy) || [];
+        for (const el of stack) {
+          if (el.parentElement !== layer || !el.textContent || !el.textContent.trim()) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 1 || r.height < 1) continue;
+          const top = (r.top - layerRect.top) / s;
+          const left = Math.max((r.left - layerRect.left) / s, Math.min(start.x, current.x));
+          const right = Math.min((r.right - layerRect.left) / s, Math.max(start.x, current.x));
+          if (right - left < 1) continue;
+          const key = Math.round(top / 4);            // group spans that share a line
+          const prev = found.get(key);
+          if (prev) {
+            const nl = Math.min(prev.x, left);
+            const nr = Math.max(prev.x + prev.w, right);
+            found.set(key, { x: nl, y: Math.min(prev.y, top), w: nr - nl, h: Math.max(prev.h, r.height / s) });
+          } else {
+            found.set(key, { x: left, y: top, w: right - left, h: r.height / s });
+          }
+        }
+      }
+    }
+    return [...found.values()];
+  }
+
+  /* ---------- drafts ---------- */
+  createDraft(pv) {
+    const d = this._draft;
+    const node = document.createElement('div');
+    node.className = 'annot-draft';
+    if (INK_TYPES.has(d.type)) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'annot-svg');
+      svg.setAttribute('width', String(pv.baseSize.width));
+      svg.setAttribute('height', String(pv.baseSize.height));
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', this.color);
+      path.setAttribute('stroke-width', String(d.type === 'marker' ? this.strokeWidth * 4 : this.strokeWidth));
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('opacity', String(d.type === 'marker' ? 0.4 : this.opacity));
+      svg.append(path);
+      node.append(svg);
+      d.path = path;
+    } else {
+      node.style.border = `1.5px dashed ${this.color}`;
+      node.style.background = `${this.color}22`;
+      if (d.type === 'ellipse') node.style.borderRadius = '50%';
+    }
+    node.style.pointerEvents = 'none';
+    pv.annotEl.append(node);
+    d.node = node;
+  }
+
+  updateShapeDraft() {
+    const d = this._draft;
+    if (!d?.node) return;
+    const x = Math.min(d.start.x, d.current.x);
+    const y = Math.min(d.start.y, d.current.y);
+    d.node.style.left = `${x}px`;
+    d.node.style.top = `${y}px`;
+    d.node.style.width = `${Math.abs(d.current.x - d.start.x)}px`;
+    d.node.style.height = `${Math.abs(d.current.y - d.start.y)}px`;
+  }
+
+  updateInkDraft() {
+    const d = this._draft;
+    if (!d?.path) return;
+    d.path.setAttribute('d', smoothPath(d.points));
+  }
+
+  /* ---------- click types (text / note / image) ---------- */
   placeClickType(pv, p) {
     if (this.tool === 'image' || this.tool === 'signature') {
       if (!this.pendingImage) {
@@ -242,15 +432,16 @@ export class AnnotationManager {
       return;
     }
 
-    // Text and sticky notes: inline editor
+    // Inline editor lives in the page wrapper (unscaled) so it stays readable at any zoom.
+    const s = this.viewer.scale;
     const wrap = document.createElement('div');
-    wrap.style.cssText = `position:absolute;left:${p.x * this.viewer.scale}px;top:${p.y * this.viewer.scale}px;z-index:9;max-width:${Math.min(320, pv.baseSize.width * 0.6) * this.viewer.scale}px`;
+    wrap.style.cssText = `position:absolute;left:${p.x * s}px;top:${p.y * s}px;z-index:9;max-width:${Math.min(320, pv.baseSize.width * 0.6) * s}px`;
     const ta = document.createElement('textarea');
     ta.className = 'textarea';
-    ta.style.cssText = 'min-height:48px;background:#fff;color:#111;border:1.5px solid var(--accent);font-size:' + (this.fontSize * this.viewer.scale) + 'px';
+    ta.style.cssText = `min-height:46px;background:#fff;color:#111;border:1.5px solid var(--accent);font-size:${Math.max(12, this.fontSize * s)}px`;
     ta.placeholder = this.tool === 'note' ? 'Note text…' : 'Type text…';
     wrap.append(ta);
-    pv.annotEl.append(wrap);
+    pv.wrap.append(wrap);
     setTimeout(() => ta.focus(), 0);
 
     const commitText = () => {
@@ -284,31 +475,6 @@ export class AnnotationManager {
     });
   }
 
-  showDraft(pv) {
-    this.clearDraft(pv);
-    const d = this._draft;
-    if (!d) return;
-    const s = this.viewer.scale;
-    const node = document.createElement('div');
-    node.className = 'annot-draft';
-    if (INK_TYPES.has(d.type)) {
-      const pts = d.points.map((p) => `${p.x * s},${p.y * s}`).join(' ');
-      node.innerHTML = `<svg class="annot-svg" width="${pv.cssWidth}" height="${pv.cssHeight}" style="position:absolute;inset:0"><polyline points="${pts}" fill="none" stroke="${this.color}" stroke-width="${(d.type === 'marker' ? this.strokeWidth * 4 : this.strokeWidth) * s}" stroke-linecap="round" stroke-linejoin="round" opacity="${d.type === 'marker' ? 0.4 : this.opacity}"/></svg>`;
-    } else {
-      const x = Math.min(d.start.x, d.current.x) * s;
-      const y = Math.min(d.start.y, d.current.y) * s;
-      const w = Math.abs(d.current.x - d.start.x) * s;
-      const h = Math.abs(d.current.y - d.start.y) * s;
-      node.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px dashed ${this.color};background:${this.color}22`;
-      if (d.type === 'ellipse') node.style.borderRadius = '50%';
-    }
-    pv.annotEl.append(node);
-  }
-
-  clearDraft(pv) {
-    pv.annotEl?.querySelectorAll('.annot-draft').forEach((n) => n.remove());
-  }
-
   /* ---------- rendering ---------- */
   renderAll() {
     this.viewer.pages.forEach((pv) => this.renderPage(pv.num));
@@ -317,44 +483,45 @@ export class AnnotationManager {
   renderPage(num) {
     const pv = this.viewer.pages[num - 1];
     if (!pv?.annotEl) return;
+    this.styleLayer(pv);
     const layer = pv.annotEl;
     layer.querySelectorAll('.annot-item, .annot-note-pop').forEach((n) => n.remove());
-    const s = this.viewer.scale;
     const list = this.items.filter((i) => i.page === num);
-
+    if (!list.length) return;
+    const frag = document.createDocumentFragment();
     for (const item of list) {
-      const node = this.buildNode(item, s, pv);
+      const node = this.buildNode(item, pv);
       if (!node) continue;
       node.dataset.id = item.id;
       if (item.id === this.selectedId) node.dataset.selected = 'true';
-      layer.append(node);
+      frag.append(node);
     }
+    layer.append(frag);
   }
 
-  buildNode(item, s, pv) {
+  buildNode(item, pv) {
     const node = document.createElement('div');
     node.className = 'annot-item';
     const opacity = item.opacity ?? 1;
 
     if (item.type === 'highlight' || item.type === 'underline' || item.type === 'strike') {
       node.classList.add('annot-hl');
-      node.style.cssText = `left:${item.x * s}px;top:${item.y * s}px;width:${item.w * s}px;height:${item.h * s}px;`;
+      node.style.cssText = `left:${item.x}px;top:${item.y}px;width:${item.w}px;height:${item.h}px;`;
       if (item.type === 'highlight') {
         node.style.background = item.color;
         node.style.opacity = String(opacity);
       } else if (item.type === 'underline') {
-        node.style.borderBottom = `${Math.max(1, item.strokeWidth * s)}px solid ${item.color}`;
+        node.style.borderBottom = `${Math.max(1, item.strokeWidth)}px solid ${item.color}`;
       } else {
-        node.style.borderTop = `${Math.max(1, item.strokeWidth * s)}px solid ${item.color}`;
-        node.style.top = `${(item.y + item.h * 0.55) * s}px`;
+        node.style.borderTop = `${Math.max(1, item.strokeWidth)}px solid ${item.color}`;
+        node.style.top = `${item.y + item.h * 0.55}px`;
         node.style.height = '0px';
       }
-      this.addHandles(node, item);
       return node;
     }
 
     if (item.type === 'rect' || item.type === 'ellipse') {
-      node.style.cssText = `left:${item.x * s}px;top:${item.y * s}px;width:${item.w * s}px;height:${item.h * s}px;border:${Math.max(1, item.strokeWidth * s)}px solid ${item.color};opacity:${opacity};`;
+      node.style.cssText = `left:${item.x}px;top:${item.y}px;width:${item.w}px;height:${item.h}px;border:${Math.max(1, item.strokeWidth)}px solid ${item.color};opacity:${opacity};`;
       if (item.type === 'ellipse') node.style.borderRadius = '50%';
       this.addHandles(node, item);
       return node;
@@ -363,38 +530,36 @@ export class AnnotationManager {
     if (item.type === 'line' || item.type === 'arrow') {
       const from = item.from || { x: item.x, y: item.y };
       const to = item.to || { x: item.x + item.w, y: item.y + item.h };
-      const x1 = from.x * s, y1 = from.y * s, x2 = to.x * s, y2 = to.y * s;
-      const head = Math.max(6, item.strokeWidth * 3.2) * Math.min(1.6, s);
+      const head = Math.max(6, (item.strokeWidth || 2) * 3.4);
       let arrow = '';
       if (item.type === 'arrow') {
-        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
         const a1 = angle - Math.PI / 7, a2 = angle + Math.PI / 7;
-        arrow = `<line x1="${x2}" y1="${y2}" x2="${x2 - head * Math.cos(a1)}" y2="${y2 - head * Math.sin(a1)}" stroke="${item.color}" stroke-width="${item.strokeWidth * s}" stroke-linecap="round"/>
-                 <line x1="${x2}" y1="${y2}" x2="${x2 - head * Math.cos(a2)}" y2="${y2 - head * Math.sin(a2)}" stroke="${item.color}" stroke-width="${item.strokeWidth * s}" stroke-linecap="round"/>`;
+        arrow = `<line x1="${to.x}" y1="${to.y}" x2="${to.x - head * Math.cos(a1)}" y2="${to.y - head * Math.sin(a1)}" stroke="${item.color}" stroke-width="${item.strokeWidth}" stroke-linecap="round"/>
+                 <line x1="${to.x}" y1="${to.y}" x2="${to.x - head * Math.cos(a2)}" y2="${to.y - head * Math.sin(a2)}" stroke="${item.color}" stroke-width="${item.strokeWidth}" stroke-linecap="round"/>`;
       }
-      node.style.cssText = `left:0;top:0;width:${pv.cssWidth}px;height:${pv.cssHeight}px;opacity:${opacity}`;
-      node.innerHTML = `<svg class="annot-svg" width="${pv.cssWidth}" height="${pv.cssHeight}" style="position:absolute;inset:0"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${item.color}" stroke-width="${Math.max(1, item.strokeWidth * s)}" stroke-linecap="round"/>${arrow}</svg>`;
+      node.style.cssText = `left:0;top:0;width:${pv.baseSize.width}px;height:${pv.baseSize.height}px;opacity:${opacity}`;
+      node.innerHTML = `<svg class="annot-svg" width="${pv.baseSize.width}" height="${pv.baseSize.height}" style="position:absolute;inset:0"><line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="${item.color}" stroke-width="${Math.max(1, item.strokeWidth)}" stroke-linecap="round"/>${arrow}</svg>`;
       return node;
     }
 
     if (item.type === 'pen' || item.type === 'marker') {
-      const pts = (item.points || []).map((p) => `${p.x * s},${p.y * s}`).join(' ');
-      node.style.cssText = `left:0;top:0;width:${pv.cssWidth}px;height:${pv.cssHeight}px;opacity:${opacity}`;
-      node.innerHTML = `<svg class="annot-svg" width="${pv.cssWidth}" height="${pv.cssHeight}" style="position:absolute;inset:0"><polyline points="${pts}" fill="none" stroke="${item.color}" stroke-width="${Math.max(1, (item.strokeWidth || 2) * s)}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      node.style.cssText = `left:0;top:0;width:${pv.baseSize.width}px;height:${pv.baseSize.height}px;opacity:${opacity}`;
+      node.innerHTML = `<svg class="annot-svg" width="${pv.baseSize.width}" height="${pv.baseSize.height}" style="position:absolute;inset:0"><path d="${smoothPath(item.points || [])}" fill="none" stroke="${item.color}" stroke-width="${Math.max(1, item.strokeWidth || 2)}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
       return node;
     }
 
     if (item.type === 'text') {
       node.classList.add('annot-text');
-      node.style.cssText = `left:${item.x * s}px;top:${item.y * s}px;max-width:${item.w * s}px;color:${item.color};font-size:${(item.fontSize || 14) * s}px;opacity:${opacity};padding:2px 3px;`;
+      node.style.cssText = `left:${item.x}px;top:${item.y}px;max-width:${item.w}px;color:${item.color};font-size:${item.fontSize || 14}px;opacity:${opacity};padding:2px 3px;`;
       node.textContent = item.text || '';
       this.addHandles(node, item);
       return node;
     }
 
     if (item.type === 'note') {
-      node.className = 'annot-item annot-note';
-      node.style.cssText = `left:${item.x * s}px;top:${item.y * s}px;width:${22 * s}px;height:${22 * s}px;background:${item.color};font-size:${11 * s}px`;
+      node.classList.add('annot-note');
+      node.style.cssText = `left:${item.x}px;top:${item.y}px;width:22px;height:22px;background:${item.color};font-size:11px`;
       node.textContent = 'N';
       node.title = item.text || '';
       node.addEventListener('click', (e) => {
@@ -403,8 +568,8 @@ export class AnnotationManager {
         if (existing) { existing.remove(); return; }
         const pop = document.createElement('div');
         pop.className = 'annot-note-pop';
-        pop.style.left = `${item.x * s + 26}px`;
-        pop.style.top = `${item.y * s}px`;
+        pop.style.left = `${item.x + 26}px`;
+        pop.style.top = `${item.y}px`;
         pop.textContent = item.text || '';
         node.parentElement.append(pop);
         setTimeout(() => pop.addEventListener('click', () => pop.remove()), 0);
@@ -416,8 +581,8 @@ export class AnnotationManager {
       const img = document.createElement('img');
       img.src = item.imageSrc;
       img.alt = item.type === 'signature' ? 'Signature' : 'Placed image';
-      img.style.cssText = `width:${item.w * s}px;height:${item.h * s}px;object-fit:contain;pointer-events:none`;
-      node.style.cssText = `left:${item.x * s}px;top:${item.y * s}px;opacity:${opacity}`;
+      img.style.cssText = `width:${item.w}px;height:${item.h}px;object-fit:contain;pointer-events:none`;
+      node.style.cssText = `left:${item.x}px;top:${item.y}px;opacity:${opacity}`;
       node.append(img);
       this.addHandles(node, item);
       return node;
@@ -454,8 +619,8 @@ export class AnnotationManager {
     const move = (ev) => {
       item.w = Math.max(8, start.w + (ev.clientX - start.x) / s);
       item.h = Math.max(8, start.h + (ev.clientY - start.y) / s);
-      node.style.width = `${item.w * s}px`;
-      node.style.height = `${item.h * s}px`;
+      node.style.width = `${item.w}px`;
+      node.style.height = `${item.h}px`;
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
@@ -482,23 +647,25 @@ export class AnnotationManager {
         this.select(item.id);
         const s = this.viewer.scale;
         const start = { x: e.clientX, y: e.clientY, ix: item.x, iy: item.y };
-        target.setPointerCapture?.(e.pointerId);
+        try { target.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         const move = (ev) => {
           item.x = start.ix + (ev.clientX - start.x) / s;
           item.y = start.iy + (ev.clientY - start.y) / s;
-          target.style.left = `${item.x * s}px`;
-          target.style.top = `${item.y * s}px`;
+          target.style.left = `${item.x}px`;
+          target.style.top = `${item.y}px`;
           if (item.type === 'line' || item.type === 'arrow') {
             const dx = item.x - start.ix, dy = item.y - start.iy;
             if (item.from) item.from = { x: item.from.x + dx, y: item.from.y + dy };
             if (item.to) item.to = { x: item.to.x + dx, y: item.to.y + dy };
             this.renderPage(item.page);
+            this.select(item.id);
           }
         };
         const up = () => {
           window.removeEventListener('pointermove', move);
           window.removeEventListener('pointerup', up);
-          item.x = round(item.x); item.y = round(item.y);
+          item.x = round(item.x);
+          item.y = round(item.y);
           this.snapshot();
           this.renderPage(item.page);
           this.commit();
@@ -514,22 +681,18 @@ export class AnnotationManager {
   }
 
   /* ---------- export ---------- */
-  /**
-   * Write every annotation into an existing pdf-lib document.
-   * @returns {Promise<{written:number, skipped:number}>}
-   */
   async exportToPdf(pdfDoc) {
     const PDFLib = window.PDFLib;
     if (!PDFLib) throw new Error('pdf-lib is not loaded, so annotations cannot be written into the PDF.');
-    const { rgb, StandardFonts, degrees } = PDFLib;
+    const { rgb, StandardFonts } = PDFLib;
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     let written = 0, skipped = 0;
-
     const pages = pdfDoc.getPages();
+
     for (const item of this.items) {
       const page = pages[item.page - 1];
       if (!page) { skipped++; continue; }
-      const { width: pw, height: ph } = page.getSize();
+      const { height: ph } = page.getSize();
       const color = hexToRgb(item.color || '#f2c744', rgb);
       const op = item.opacity ?? 1;
       const flipY = (y, h = 0) => ph - y - h;
@@ -605,8 +768,19 @@ export class AnnotationManager {
   }
 }
 
-function layerCapture(e, el) {
-  try { el.setPointerCapture?.(e.pointerId); } catch { /* ignore */ }
+/** Quadratic-curve path through the sampled points — smoother than a polyline. */
+function smoothPath(points) {
+  if (!points || points.length < 2) return '';
+  if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const mx = (points[i].x + points[i + 1].x) / 2;
+    const my = (points[i].y + points[i + 1].y) / 2;
+    d += ` Q ${points[i].x} ${points[i].y} ${mx} ${my}`;
+  }
+  const last = points[points.length - 1];
+  d += ` L ${last.x} ${last.y}`;
+  return d;
 }
 
 function round(n) { return Math.round(n * 100) / 100; }
@@ -623,18 +797,15 @@ async function embedImage(pdfDoc, dataUrl) {
   if (!dataUrl) return null;
   if (/^data:image\/png/i.test(dataUrl)) return pdfDoc.embedPng(dataUrl);
   if (/^data:image\/jpe?g/i.test(dataUrl)) return pdfDoc.embedJpg(dataUrl);
-  // Convert anything else (webp, svg, gif) through a canvas first.
   const img = new Image();
   await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalWidth || img.width;
   canvas.height = img.naturalHeight || img.height;
   canvas.getContext('2d').drawImage(img, 0, 0);
-  const png = canvas.toDataURL('image/png');
-  return pdfDoc.embedPng(png);
+  return pdfDoc.embedPng(canvas.toDataURL('image/png'));
 }
 
-/** Standard PDF fonts are WinAnsi-only; replace characters they cannot encode. */
 function toWinAnsi(text) {
   const replacements = {
     '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"', '\u2013': '-', '\u2014': '-', '\u2026': '...', '\u00a0': ' '

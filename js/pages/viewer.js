@@ -66,6 +66,8 @@ async function main() {
 /* ---------------- Toolbar ---------------- */
 function buildToolbar() {
   S.toolbar = new Toolbar(els.toolbar, {
+    pan: true,
+    onPan: togglePan,
     onSidebar: toggleSidebar,
     onPrev: () => S.viewer?.prevPage(),
     onNext: () => S.viewer?.nextPage(),
@@ -110,11 +112,22 @@ function buildToolbar() {
   S.toolbar.setMode(store.get('mode') || 'vertical');
 }
 
+function togglePan() {
+  if (!S.viewer) return;
+  const on = !S.viewer.panMode;
+  S.viewer.setPanMode(on);
+  S.toolbar.setPanPressed(on);
+  if (on) setTool('select');
+  toast(on
+    ? 'Hand tool on — drag to move the page (or hold Space to pan temporarily)'
+    : 'Hand tool off', { duration: 2400 });
+}
+
 function syncZoom() {
   if (!S.viewer) return;
   S.toolbar.setZoom(Math.round(S.viewer.scale * 100));
-  S.search?.refresh();
-  S.annots?.renderAll();
+  // Annotation layers are scaled with one CSS transform; no DOM rebuild needed.
+  S.annots?.syncZoom();
 }
 
 /* ---------------- Annotation palette ---------------- */
@@ -124,9 +137,13 @@ function buildAnnotBar() {
     <span class="tb-sep"></span>
     <div class="tb-group" id="annot-colors"></div>
     <span class="tb-sep"></span>
-    <label class="row small muted" style="gap:6px;padding:0 4px">
+    <label class="row small muted" style="gap:6px;padding:0 4px" title="Stroke thickness">
       <span class="width-preview" id="width-preview"></span>
       <input type="range" min="1" max="12" step="0.5" value="2" id="annot-width" aria-label="Stroke thickness">
+    </label>
+    <label class="row small muted" style="gap:6px;padding:0 4px" title="Annotation opacity">
+      ${icon('eye', 'icon-sm')}
+      <input type="range" min="10" max="100" step="5" value="100" id="annot-opacity" aria-label="Annotation opacity" style="width:64px">
     </label>
     <span class="tb-sep"></span>
     <button class="tb-btn" data-annot="signature" title="Draw a signature">${icon('signature')}</button>
@@ -134,7 +151,8 @@ function buildAnnotBar() {
     <span class="tb-sep"></span>
     <button class="tb-btn" data-annot="undo" title="Undo">${icon('undo')}</button>
     <button class="tb-btn" data-annot="redo" title="Redo">${icon('redo')}</button>
-    <button class="tb-btn" data-annot="delete" title="Delete selected">${icon('trash')}</button>
+    <button class="tb-btn" data-annot="duplicate" title="Duplicate selected (Ctrl+D)">${icon('copy')}</button>
+    <button class="tb-btn" data-annot="delete" title="Delete selected (Del)">${icon('trash')}</button>
     <button class="tb-btn" data-annot="clear" title="Clear page annotations">${icon('x')}</button>
     <span class="tb-sep"></span>
     <button class="tb-btn" data-annot="save-pdf" title="Write annotations into a PDF">${icon('save')}</button>`;
@@ -173,12 +191,16 @@ function buildAnnotBar() {
     S.annots?.setStrokeWidth(Number(e.target.value));
     els.annotBar.querySelector('#width-preview').innerHTML = `<span style="display:block;width:14px;height:${e.target.value}px;background:currentColor;border-radius:2px"></span>`;
   });
+  els.annotBar.querySelector('#annot-opacity').addEventListener('input', (e) => {
+    S.annots?.setOpacity(Number(e.target.value) / 100);
+  });
 
   els.annotBar.querySelectorAll('[data-annot]').forEach((b) => {
     b.addEventListener('click', () => {
       const act = b.dataset.annot;
       if (act === 'undo') { S.annots?.undo(); renderAnnotList(); }
       else if (act === 'redo') { S.annots?.redo(); renderAnnotList(); }
+      else if (act === 'duplicate') S.annots?.duplicateSelected();
       else if (act === 'delete') S.annots?.deleteSelected();
       else if (act === 'clear') clearPageAnnotations();
       else if (act === 'signature') drawSignature();
@@ -187,6 +209,15 @@ function buildAnnotBar() {
     });
   });
   setTool('select');
+}
+
+function useTool(id) {
+  if (!S.annots) return;
+  if (els.annotBar.dataset.open !== 'true') {
+    els.annotBar.dataset.open = 'true';
+    S.toolbar?.setAnnotPressed(true);
+  }
+  setTool(id);
 }
 
 function setTool(id) {
@@ -431,13 +462,19 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   S.annots = new AnnotationManager({
     viewer: S.viewer,
     onChange: (items) => {
-      if (S.docKey) saveAnnotations(S.docKey, items).catch(() => {});
-      renderAnnotList();
+      // Persist lazily: a stroke or a drag fires many small changes.
+      clearTimeout(S._saveAnnTimer);
+      S._saveAnnTimer = setTimeout(() => {
+        if (S.docKey) saveAnnotations(S.docKey, S.annots.items).catch(() => {});
+      }, 500);
+      clearTimeout(S._annotListTimer);
+      S._annotListTimer = setTimeout(renderAnnotList, 220);
     },
     onSelect: () => {}
   });
   S.annots.attach();
   S.annots.enableSelectInteractions();
+  S.annots.syncZoom();
   try {
     const saved = S.docKey ? await getAnnotations(S.docKey) : [];
     if (saved.length) {
@@ -504,8 +541,12 @@ function onViewerEvent(type, detail) {
     scheduleSave();
   } else if (type === 'zoomChanged') {
     S.toolbar.setZoom(detail.percent);
-    requestAnimationFrame(() => { S.annots?.renderAll(); S.search?.refresh(); });
+    S.annots?.syncZoom();
     scheduleSave();
+  } else if (type === 'zoomSettled') {
+    S.toolbar.setZoom(detail.percent);
+    S.annots?.syncZoom();
+    S.search?.refresh();
   } else if (type === 'scroll') {
     els.progress.style.width = `${detail.progress * 100}%`;
   } else if (type === 'modeChanged') {
@@ -1077,6 +1118,24 @@ function bindKeys() {
     sidebar: () => toggleSidebar(),
     fullscreen: () => toggleFullscreen(),
     rotate: () => S.viewer?.rotate(90),
+    pan: () => togglePan(),
+    toolSelect: () => useTool('select'),
+    toolHighlight: () => useTool('highlight'),
+    toolUnderline: () => useTool('underline'),
+    toolStrike: () => useTool('strike'),
+    toolPen: () => useTool('pen'),
+    toolMarker: () => useTool('marker'),
+    toolEraser: () => useTool('eraser'),
+    toolText: () => useTool('text'),
+    toolNote: () => useTool('note'),
+    toolRect: () => useTool('rect'),
+    toolEllipse: () => useTool('ellipse'),
+    toolArrow: () => useTool('arrow'),
+    toolLine: () => useTool('line'),
+    toolImage: () => pickImage(),
+    toolSignature: () => drawSignature(),
+    duplicate: () => S.annots?.duplicateSelected(),
+    deleteSelected: () => S.annots?.deleteSelected(),
     zen: () => S.toolbar.host.querySelector('[data-act="zen"]').click()
   }, { enabled: store.get('shortcutsEnabled') !== false }).attach();
 }

@@ -22,6 +22,7 @@ export class Toolbar {
     this.opts = {
       sidebar: true, search: true, download: true, print: true, fullscreen: true,
       annotations: true, navigation: true, title: true, minimal: false, moreMenu: true,
+      pan: false,
       ...opts
     };
     this.refs = {};
@@ -32,6 +33,7 @@ export class Toolbar {
     this.host.className = 'viewer-toolbar';
     this.host.innerHTML = `
       ${o.sidebar ? `<button class="tb-btn" data-act="sidebar" aria-label="Toggle sidebar" title="Sidebar (Ctrl+B)" aria-pressed="true">${icon('sidebar')}</button>` : ''}
+      ${o.pan ? `<button class="tb-btn" data-act="pan" aria-label="Hand tool — drag to move the page" title="Hand tool (H) · or hold Space" aria-pressed="false">${icon('move')}</button>` : ''}
       ${o.title ? `<div class="tb-title">
         <span class="doc-name" data-ref="docName">No document</span>
         <span class="doc-meta" data-ref="docMeta"></span>
@@ -125,6 +127,7 @@ export class Toolbar {
     };
 
     click('sidebar', () => o.onSidebar?.());
+    click('pan', () => o.onPan?.());
     click('prev', () => o.onPrev?.());
     click('next', () => o.onNext?.());
     click('zoom-in', () => o.onZoomIn?.());
@@ -247,6 +250,10 @@ export class Toolbar {
 
   setSearchCount(text) {
     if (this.refs.searchCount) this.refs.searchCount.textContent = text;
+  }
+
+  setPanPressed(on) {
+    this.host.querySelector('[data-act="pan"]')?.setAttribute('aria-pressed', String(on));
   }
 
   setSidebarPressed(on) {

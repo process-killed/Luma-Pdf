@@ -8,13 +8,13 @@
 <meta name="theme-color" content="#fcfcfd">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/tokens.css?v=1.0.0">
-<link rel="stylesheet" href="css/reset.css?v=1.0.0">
-<link rel="stylesheet" href="css/themes.css?v=1.0.0">
-<link rel="stylesheet" href="css/main.css?v=1.0.0">
-<link rel="stylesheet" href="css/layout.css?v=1.0.0">
-<link rel="stylesheet" href="css/animations.css?v=1.0.0">
-<link rel="stylesheet" href="css/responsive.css?v=1.0.0">
+<link rel="stylesheet" href="css/tokens.css?v=1.0.1">
+<link rel="stylesheet" href="css/reset.css?v=1.0.1">
+<link rel="stylesheet" href="css/themes.css?v=1.0.1">
+<link rel="stylesheet" href="css/main.css?v=1.0.1">
+<link rel="stylesheet" href="css/layout.css?v=1.0.1">
+<link rel="stylesheet" href="css/animations.css?v=1.0.1">
+<link rel="stylesheet" href="css/responsive.css?v=1.0.1">
 <script>
   try {
     var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
@@ -290,12 +290,18 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
         <table>
           <thead><tr><th>Profile</th><th>Canvas budget</th><th>DPR cap</th><th>Concurrent renders</th><th>Cached pages</th></tr></thead>
           <tbody>
-            <tr><td>Eco</td><td>1.6 MP</td><td>1.0</td><td>1</td><td>2</td></tr>
-            <tr><td>Balanced</td><td>4.2 MP</td><td>1.5</td><td>2</td><td>4</td></tr>
+            <tr><td>Eco</td><td>2.2 MP</td><td>1.0</td><td>2</td><td>3</td></tr>
+            <tr><td>Balanced</td><td>4.6 MP</td><td>1.75</td><td>3</td><td>5</td></tr>
             <tr><td>Performance</td><td>12 MP</td><td>2.0</td><td>3</td><td>8</td></tr>
           </tbody>
         </table>
-        <p>Only visible pages (plus a small margin) are rendered; off-screen canvases are released, and thumbnails reuse the on-screen bitmap when possible. Page sizes are measured after the first paint, so a 500-page document opens as fast as a 5-page one.</p>
+        <p>Only pages near the viewport are mounted and rendered; everything else stays as a same-size placeholder, so a 500-page document costs the same to open as a 5-page one. Page geometry is measured once per layout change, never during a scroll, and the page under the reader renders first while a fast scroll is in flight.</p>
+        <h3>Interaction</h3>
+        <ul>
+          <li><strong>Zoom</strong> stretches the existing bitmaps and re-renders only what is visible — no blank flashes. <code>Ctrl</code>/<code>Cmd</code> + wheel and two-finger pinch zoom around the cursor or pinch centre, and the point under your fingers stays pinned.</li>
+          <li><strong>Pan</strong> with the hand tool, a middle-button drag, or <code>Space</code> + drag. Touch keeps native momentum scrolling, and a zoomed page is always reachable to its edges.</li>
+          <li><strong>Annotations</strong> live in page coordinates and are scaled by a single CSS transform, so zooming never rebuilds them. Ink strokes are smoothed, and highlights snap to the text lines you drag across.</li>
+        </ul>
 
         <h2 id="testing">Testing</h2>
         <p>A manual checklist that matches what was verified during development:</p>
@@ -303,7 +309,8 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
           <li>Open a local PDF, a same-origin URL and a cross-origin URL that allows CORS.</li>
           <li>Trigger a CORS failure on purpose: the viewer must explain it and offer retry.</li>
           <li>Search for a word present on several pages; step through matches with Enter and Shift+Enter.</li>
-          <li>Zoom to 400%, switch to spread and book mode, rotate, then return to fit width.</li>
+          <li>Zoom to 400% with <code>Ctrl</code> + wheel: the point under the cursor must stay put, and the page must stay pannable to every edge.</li>
+          <li>Switch to spread and book mode, rotate, then return to fit width.</li>
           <li>Highlight text, draw with the pen, add a note, then export the annotated copy and reopen it.</li>
           <li>Run Merge, Split, Rotate, Watermark and Compress on the same file and open every output.</li>
           <li>In the embed: toggle the sidebar, change theme, and drive it with <code>setPage</code> from the parent.</li>
@@ -329,6 +336,6 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
 <footer data-shell="footer"></footer>
 <div class="toast-host" aria-live="polite"></div>
 
-<script type="module" src="js/pages/docs.js?v=1.0.0"></script>
+<script type="module" src="js/pages/docs.js?v=1.0.1"></script>
 </body>
 </html>

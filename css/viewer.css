@@ -9,13 +9,22 @@ body.viewer-page { overflow: hidden; }
 .workspace {
   position: relative; flex: 1; min-width: 0; overflow: auto;
   background-color: var(--workspace);
-  background-image: radial-gradient(circle at 1px 1px, var(--workspace-pattern) 1px, transparent 0);
-  background-size: 22px 22px;
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--workspace) 88%, #000 4%), var(--workspace) 220px);
+  background-repeat: no-repeat;
+  background-attachment: local;
   scroll-behavior: auto;
   overscroll-behavior: contain;
+  /* Native panning stays available; two-finger pinch is handled by the viewer. */
+  touch-action: pan-x pan-y;
 }
 .workspace.no-pattern { background-image: none; }
-.page-stack { display: flex; flex-direction: column; align-items: center; gap: var(--page-gap, 14px); padding: 18px 16px 64px; min-height: 100%; }
+.page-stack {
+  display: flex; flex-direction: column; align-items: center;
+  align-items: safe center;              /* falls back to flex-start when a page overflows */
+  justify-content: flex-start;
+  gap: var(--page-gap, 14px); padding: 18px 16px 64px; min-height: 100%;
+  width: max-content; min-width: 100%;
+}
 .page-stack[data-mode="horizontal"] { flex-direction: row; align-items: center; justify-content: flex-start; padding: 18px 24px; gap: var(--page-gap, 14px); min-height: 100%; }
 .page-stack[data-mode="spread"] { display: flex; flex-direction: column; align-items: center; gap: var(--page-gap, 14px); }
 .spread-row { display: flex; align-items: flex-start; justify-content: center; gap: 6px; }
@@ -32,8 +41,7 @@ body.viewer-page { overflow: hidden; }
 :root[data-theme="dark"] .page-wrap { background: #1a1a20; }
 @keyframes luma-shimmer { 0% { background-position: 130% 0; } 100% { background-position: -30% 0; } }
 .page-canvas { display: block; border-radius: 2px; }
-.page-wrap.rendered .page-canvas { animation: luma-page-in var(--dur-3) var(--ease-out); }
-@keyframes luma-page-in { from { opacity: .35; } to { opacity: 1; } }
+.page-canvas { transition: none; }
 .page-skeleton { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-300); }
 
 /* Text layer */
@@ -52,7 +60,7 @@ body.viewer-page { overflow: hidden; }
 
 /* Search highlights */
 .search-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-.search-hit { position: absolute; background: rgba(255, 205, 46, .42); border-radius: 2px; mix-blend-mode: multiply; }
+.search-hit { position: absolute; background: rgba(255, 205, 46, .45); border-radius: 2px; }
 .search-hit.is-active { background: rgba(255, 158, 22, .6); box-shadow: 0 0 0 1.5px rgba(226, 122, 0, .75); }
 :root[data-theme="dark"] .search-hit { background: rgba(255, 205, 46, .3); }
 :root[data-theme="dark"] .search-hit.is-active { background: rgba(255, 168, 40, .5); }
@@ -80,6 +88,14 @@ body.viewer-page { overflow: hidden; }
   font-weight: 600; color: var(--accent-text);
 }
 .viewer-drop[data-active="true"] { display: grid; }
+
+/* Panning (drag to move the document) */
+.workspace.pan-mode { cursor: grab; }
+.workspace.pan-ready { cursor: grab; }
+.workspace.is-panning { cursor: grabbing; user-select: none; }
+.workspace.is-panning * { user-select: none !important; }
+.workspace.pan-mode .textLayer span { cursor: grab; }
+.workspace.pan-mode .annotation-layer { pointer-events: none; }
 
 /* Floating page indicator */
 .page-pill {
@@ -123,4 +139,12 @@ body.viewer-page { overflow: hidden; }
   .workspace { padding-bottom: 54px; }
   .page-stack { padding: 10px 8px 70px; }
   .page-pill { display: none; }
+}
+
+/* Placeholder for pages that are not mounted yet: same box, no content. */
+.page-ph {
+  flex: none; border-radius: 2px;
+  background: color-mix(in srgb, var(--workspace-pattern) 55%, transparent);
+  box-shadow: var(--page-shadow);
+  opacity: .55;
 }

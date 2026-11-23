@@ -5,18 +5,17 @@ import { PERFORMANCE } from '../config.js';
 export function detectDevice() {
   const info = deviceInfo();
   const weak = (
-    (info.memoryGB !== null && info.memoryGB <= 3) ||
-    (info.cores !== null && info.cores <= 4) ||
-    (info.connection && ['slow-2g', '2g', '3g'].includes(info.connection.type)) ||
-    (info.connection && info.connection.saveData) ||
-    (info.dpr > 2.6)
+    (info.memoryGB !== null && info.memoryGB <= 2) ||
+    (info.cores !== null && info.cores <= 2) ||
+    (info.connection && ['slow-2g', '2g'].includes(info.connection.type)) ||
+    (info.connection && info.connection.saveData)
   );
   return { ...info, weak, supports };
 }
 
 export function recommendProfile(info = detectDevice()) {
   if (info.weak) return 'eco';
-  if ((info.memoryGB && info.memoryGB >= 8) && (info.cores || 0) >= 8) return 'performance';
+  if ((info.memoryGB && info.memoryGB >= 8) && (info.cores || 0) >= 8 && (info.dpr || 1) <= 2.5) return 'performance';
   return 'balanced';
 }
 

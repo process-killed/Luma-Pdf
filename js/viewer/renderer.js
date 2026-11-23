@@ -1,6 +1,13 @@
 /**
  * Page renderer — owns one page's DOM: canvas, text layer, search layer, annotation layer.
- * Rendering is cancellable and every buffer is released on request.
+ *
+ * Performance contract:
+ *  - the canvas element and its bitmap are reused; zooming stretches the existing
+ *    bitmap instead of blanking the page, so a zoom never shows an empty page;
+ *  - the text layer is built on demand (after paint, when the zoom settles) and is
+ *    CSS-scaled in the meantime, so selection survives a zoom gesture;
+ *  - rendering is cancellable and buffers are released only when the page leaves the
+ *    cache window.
  */
 import { engineReady, renderPageToCanvas } from './pdf-engine.js';
 import { computeRenderPlan } from '../performance/adaptive-rendering.js';
@@ -21,23 +28,55 @@ export class PageView {
     this.searchEl = null;
     this.annotEl = null;
     this.rendered = false;
+    this.stale = true;
     this.rendering = null;
     this.renderTask = null;
-    this.textLayer = null;
+    this.textLayerScale = 0;
+    this.textLayerTask = null;
     this.page = null;
     this.searchRects = [];
-    this.visible = false;
+    this.cssWidth = 0;
+    this.cssHeight = 0;
+  }
+
+  /** Lightweight stand-in with the page's exact size (no canvas, no layers). */
+  createPlaceholder() {
+    const ph = document.createElement('div');
+    ph.className = 'page-ph';
+    ph.dataset.page = String(this.num);
+    ph.setAttribute('aria-hidden', 'true');
+    const w = Math.max(1, Math.round(this.baseSize.width * this.scale));
+    const h = Math.max(1, Math.round(this.baseSize.height * this.scale));
+    ph.style.width = `${w}px`;
+    ph.style.height = `${h}px`;
+    this.placeholder = ph;
+    return ph;
+  }
+
+  get node() { return this.wrap || this.placeholder || null; }
+
+  /** Replace the placeholder with the real page node (called when it nears the viewport). */
+  mountInto(parent) {
+    if (this.wrap) return this.wrap;
+    const wrap = this.mount(parent);
+    if (this.placeholder) {
+      if (this.placeholder.parentElement) this.placeholder.replaceWith(wrap);
+      else parent.append(wrap);
+      this.placeholder = null;
+    }
+    return wrap;
   }
 
   mount(parent, { withTextLayer = true } = {}) {
     const wrap = document.createElement('div');
-    wrap.className = 'page-wrap is-loading';
+    wrap.className = 'page-wrap';
     wrap.dataset.page = String(this.num);
     wrap.setAttribute('role', 'region');
     wrap.setAttribute('aria-label', `Page ${this.num}`);
 
     const canvas = document.createElement('canvas');
     canvas.className = 'page-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
     wrap.append(canvas);
 
     if (withTextLayer) {
@@ -54,30 +93,56 @@ export class PageView {
     const annotEl = document.createElement('div');
     annotEl.className = 'annotation-layer';
     annotEl.dataset.page = String(this.num);
+    annotEl.dataset.mode = 'select';
     wrap.append(annotEl);
 
     this.wrap = wrap;
     this.canvas = canvas;
     this.searchEl = searchEl;
     this.annotEl = annotEl;
-    this.applySize();
+    this.applySize(this.scale);
+    if (this.searchRects?.length) this.redrawSearch();
     parent.append(wrap);
     return wrap;
   }
 
+  /**
+   * Size the page for the current zoom. If a bitmap already exists it is stretched
+   * (CSS) and marked stale, which keeps the page visible while it re-renders.
+   */
   applySize(scale = this.scale) {
+    const changed = Math.abs(scale - this.scale) > 0.0001;
     this.scale = scale;
     if (!this.wrap) return;
     const w = Math.max(1, Math.round(this.baseSize.width * scale));
     const h = Math.max(1, Math.round(this.baseSize.height * scale));
-    this.wrap.style.width = `${w}px`;
-    this.wrap.style.height = `${h}px`;
     this.cssWidth = w;
     this.cssHeight = h;
+    this.wrap.style.width = `${w}px`;
+    this.wrap.style.height = `${h}px`;
+    if (this.placeholder) {
+      this.placeholder.style.width = `${w}px`;
+      this.placeholder.style.height = `${h}px`;
+    }
+
+    if (this.canvas && this.canvas.width > 0) {
+      this.canvas.style.width = `${w}px`;
+      this.canvas.style.height = `${h}px`;
+      if (changed) {
+        this.stale = true;
+        this.wrap.dataset.stale = 'true';
+      }
+    }
+    // Keep the text layer aligned during a zoom gesture; it is rebuilt on settle.
+    if (this.textLayerEl && this.textLayerScale && changed) {
+      const k = scale / this.textLayerScale;
+      this.textLayerEl.style.transform = `scale(${k})`;
+      this.textLayerEl.style.transformOrigin = '0 0';
+    }
   }
 
-  /** Placeholder height without a canvas — keeps scroll position stable. */
   async ensurePage(doc) {
+    if (doc) this.docRef = doc;
     if (this.page) return this.page;
     this.page = await doc.getPage(this.num);
     const vp = this.page.getViewport({ scale: 1, rotation: this.rotation });
@@ -85,11 +150,13 @@ export class PageView {
     return this.page;
   }
 
+  /** Render the canvas only. The text layer is built separately by the viewer. */
   async render(doc, { scale, profile, dpr }) {
-    if (this.rendered || this.rendering) return this.rendering;
+    if (this.rendering) return this.rendering;
     const page = await this.ensurePage(doc);
     const plan = computeRenderPlan(this.baseSize, this.baseSize.width * scale, profile, dpr);
     const rotation = this.rotation;
+    const token = (this.renderToken = (this.renderToken || 0) + 1);
 
     this.rendering = (async () => {
       try {
@@ -98,19 +165,21 @@ export class PageView {
           outputScale: plan.outputScale,
           rotation
         });
+        if (token !== this.renderToken) return;      // a newer render superseded this one
         this.canvas.style.width = `${plan.cssWidth}px`;
         this.canvas.style.height = `${plan.cssHeight}px`;
         this.wrap.style.width = `${plan.cssWidth}px`;
         this.wrap.style.height = `${plan.cssHeight}px`;
+        this.cssWidth = plan.cssWidth;
+        this.cssHeight = plan.cssHeight;
         this.rendered = true;
-        this.wrap.classList.remove('is-loading');
+        this.stale = false;
         this.wrap.classList.add('rendered');
-        await this.buildTextLayer(page, plan.scale);
+        this.wrap.dataset.stale = 'false';
         this.redrawSearch();
       } catch (err) {
         if (err?.name !== 'RenderingCancelledException') {
-          console.warn('Page render failed', this.num, err);
-          this.wrap.classList.remove('is-loading');
+          console.warn('Page render failed', this.num, err?.message);
           this.wrap.classList.add('render-error');
         }
       } finally {
@@ -120,33 +189,46 @@ export class PageView {
     return this.rendering;
   }
 
-  async buildTextLayer(page, scale) {
+  /** Build (or rebuild) the selectable text layer at the given scale. */
+  async ensureTextLayer(doc, scale = this.scale) {
     if (!this.textLayerEl) return;
+    if (Math.abs(this.textLayerScale - scale) < 0.01) return;
+    if (this.textLayerTask) return this.textLayerTask;
     const lib = await engineReady();
     if (!lib.renderTextLayer) return;
-    this.textLayerEl.replaceChildren();
-    this.textLayerEl.style.setProperty('--scale-factor', String(scale));
-    this.textLayerEl.style.width = `${this.cssWidth}px`;
-    this.textLayerEl.style.height = `${this.cssHeight}px`;
-    try {
-      const viewport = page.getViewport({ scale, rotation: this.rotation });
-      const textContent = await page.getTextContent();
-      const task = lib.renderTextLayer({
-        textContentSource: textContent,
-        container: this.textLayerEl,
-        viewport,
-        textDivs: [],
-        textDivProperties: new WeakMap(),
-        textContentItemsStr: [],
-        isOffscreenCanvasSupported: true
-      });
-      await task.promise;
-      this.textDivs = task.textDivs || [];
-      this.textContentItemsStr = task.textContentItemsStr || [];
-    } catch (e) {
-      // Text selection is a progressive enhancement — never block the page on it.
-      console.warn('Text layer unavailable for page', this.num, e?.message);
-    }
+
+    this.textLayerTask = (async () => {
+      try {
+        const page = await this.ensurePage(doc || this.docRef);
+        const viewport = page.getViewport({ scale, rotation: this.rotation });
+        const textContent = await page.getTextContent();
+        const el = this.textLayerEl;
+        el.replaceChildren();
+        el.style.transform = 'none';
+        el.style.width = `${this.cssWidth}px`;
+        el.style.height = `${this.cssHeight}px`;
+        // PDF.js positions text spans relative to this factor.
+        el.style.setProperty('--scale-factor', String(scale));
+        const task = lib.renderTextLayer({
+          textContentSource: textContent,
+          container: el,
+          viewport,
+          textDivs: [],
+          textDivProperties: new WeakMap(),
+          textContentItemsStr: [],
+          isOffscreenCanvasSupported: true
+        });
+        await task.promise;
+        this.textDivs = task.textDivs || [];
+        this.textContentItemsStr = task.textContentItemsStr || [];
+        this.textLayerScale = scale;
+      } catch (e) {
+        console.warn('Text layer unavailable for page', this.num, e?.message);
+      } finally {
+        this.textLayerTask = null;
+      }
+    })();
+    return this.textLayerTask;
   }
 
   cancel() {
@@ -157,16 +239,18 @@ export class PageView {
   /** Free pixel buffers while keeping the DOM node in place. */
   release() {
     this.cancel();
+    this.renderToken = (this.renderToken || 0) + 1;
     if (this.canvas) {
       this.canvas.width = 0;
       this.canvas.height = 0;
     }
     if (this.textLayerEl) this.textLayerEl.replaceChildren();
+    this.textLayerScale = 0;
     this.rendered = false;
+    this.stale = true;
     this.rendering = null;
-    this.textLayer = null;
     this.wrap?.classList.remove('rendered');
-    this.wrap?.classList.add('is-loading');
+    this.wrap?.removeAttribute('data-stale');
     this.clearSearch();
   }
 
@@ -189,14 +273,15 @@ export class PageView {
     if (!this.searchEl) return;
     this.searchEl.replaceChildren();
     if (!this.searchRects.length) return;
+    const s = this.scale;
     const frag = document.createDocumentFragment();
     this.searchRects.forEach((r, i) => {
       const box = document.createElement('div');
       box.className = 'search-hit' + (i === this.activeSearchIndex ? ' is-active' : '');
-      box.style.left = `${r.left}px`;
-      box.style.top = `${r.top}px`;
-      box.style.width = `${r.width}px`;
-      box.style.height = `${r.height}px`;
+      box.style.left = `${r.left * s}px`;
+      box.style.top = `${r.top * s}px`;
+      box.style.width = `${r.width * s}px`;
+      box.style.height = `${r.height * s}px`;
       frag.append(box);
     });
     this.searchEl.append(frag);
@@ -208,12 +293,9 @@ export class PageView {
   }
 }
 
-/** Geometry of a text item in viewport (CSS) space at a given scale. */
-export function textItemBox(item, scale) {
-  const tx = window.pdfjsLib.Util.transform(
-    [scale, 0, 0, scale, 0, 0],
-    item.transform
-  );
+/** Geometry of a text item in page units (scale 1). */
+export function textItemBox(item, scale = 1) {
+  const tx = window.pdfjsLib.Util.transform([scale, 0, 0, scale, 0, 0], item.transform);
   const fontHeight = Math.hypot(tx[2], tx[3]) || Math.abs(tx[3]) || 10;
   return {
     left: tx[4],

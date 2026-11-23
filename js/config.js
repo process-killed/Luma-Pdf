@@ -8,13 +8,13 @@ export const APP = {
   tagline: 'A universal PDF workspace that runs entirely in your browser.',
   origin: (typeof location !== 'undefined' ? location.origin + location.pathname.replace(/\/[^/]*$/, '/') : 'https://lumapdf.example/'),
   repo: 'https://github.com/',
-  version: '1.0.0',
-  build: '2026-11-22 20:30 IST',
-  buildId: 'b2026-11-22-1'
+  version: '1.0.1',
+  build: '2026-11-22 22:45 IST',
+  buildId: 'b2026-11-22-2'
 };
 
 /** Asset version query — bump together with APP.version on every real change. */
-export const ASSET_V = '1.0.0';
+export const ASSET_V = '1.0.1';
 
 export const PATHS = {
   pdfjs: 'vendor/pdfjs/pdf.min.js',
@@ -41,24 +41,24 @@ export const PERFORMANCE = {
   profiles: ['eco', 'balanced', 'performance'],
   eco: {
     label: 'Eco',
-    maxCanvasPixels: 1_600_000,
+    maxCanvasPixels: 2_200_000,
     maxDevicePixelRatio: 1,
-    preRender: 0,
-    maxConcurrentRenders: 1,
+    preRender: 1,
+    maxConcurrentRenders: 2,
     thumbnailQuality: 0.55,
     thumbnailWidth: 110,
-    cachePages: 2,
+    cachePages: 3,
     animations: false
   },
   balanced: {
     label: 'Balanced',
-    maxCanvasPixels: 4_200_000,
-    maxDevicePixelRatio: 1.5,
+    maxCanvasPixels: 4_600_000,
+    maxDevicePixelRatio: 1.75,
     preRender: 1,
-    maxConcurrentRenders: 2,
+    maxConcurrentRenders: 3,
     thumbnailQuality: 0.75,
     thumbnailWidth: 150,
-    cachePages: 4,
+    cachePages: 5,
     animations: true
   },
   performance: {
@@ -95,8 +95,8 @@ export const ZOOM_STEPS = [25, 33, 50, 67, 75, 90, 100, 110, 125, 150, 175, 200,
 
 /** Keyboard shortcut defaults (editable in Settings). */
 export const SHORTCUTS = {
-  next: ['ArrowRight', 'ArrowDown', 'PageDown', 'j', 'n'],
-  prev: ['ArrowLeft', 'ArrowUp', 'PageUp', 'k', 'p'],
+  next: ['ArrowRight', 'ArrowDown', 'PageDown'],
+  prev: ['ArrowLeft', 'ArrowUp', 'PageUp'],
   first: ['Home'],
   last: ['End'],
   search: ['ctrl+f', 'meta+f'],
@@ -110,7 +110,25 @@ export const SHORTCUTS = {
   sidebar: ['ctrl+b', 'meta+b'],
   fullscreen: ['f'],
   rotate: ['r'],
-  zoomReset: ['ctrl+1']
+  zoomReset: ['ctrl+1'],
+  pan: ['h'],
+  toolSelect: ['v'],
+  toolHighlight: ['s'],
+  toolUnderline: ['u'],
+  toolStrike: ['k'],
+  toolPen: ['p'],
+  toolMarker: ['m'],
+  toolEraser: ['e'],
+  toolText: ['t'],
+  toolNote: ['n'],
+  toolRect: ['b'],
+  toolEllipse: ['o'],
+  toolArrow: ['a'],
+  toolLine: ['l'],
+  toolImage: ['g'],
+  toolSignature: ['i'],
+  duplicate: ['ctrl+d', 'meta+d'],
+  deleteSelected: ['Delete', 'Backspace']
 };
 
 export const ANNOTATION_TOOLS = [

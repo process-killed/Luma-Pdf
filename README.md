@@ -2,7 +2,7 @@
 
 A universal PDF workspace that runs entirely in the browser: read, search, annotate, edit, convert, and embed PDFs without uploading anything.
 
-**v1.0.0** · static files · no build step · no backend · no account
+**v1.0.1** · static files · no build step · no backend · no account
 
 ---
 
@@ -10,7 +10,7 @@ A universal PDF workspace that runs entirely in the browser: read, search, annot
 
 | Surface | File | What you get |
 | --- | --- | --- |
-| Viewer | `viewer.html` | Continuous / single / horizontal / spread / book layouts, RTL, presentation and distraction-free modes, 25–500% zoom, whole-document search over the real text layer, thumbnails, outline, bookmarks, annotations (highlight, ink, shapes, notes, signatures) and export into a new PDF |
+| Viewer | `viewer.html` | Continuous / single / horizontal / spread / book layouts, RTL, presentation and distraction-free modes, 25–500% zoom with pinch and cursor-anchored wheel zoom, drag-to-pan, whole-document search over the real text layer, thumbnails, outline, bookmarks, annotations that snap to text (highlight, ink, shapes, notes, signatures) and export into a new PDF |
 | Tools | `tools.html` | 33 utilities: merge, split, extract, delete, reorder, rotate, crop, resize, duplicate, PDF↔JPG/PNG/WebP, images→PDF, PDF↔text, print images, compress, optimise, reduce, strip metadata, metadata, page count, file info, dimensions, version, password check, outline, text extraction, screenshot, watermark, page numbers, signature |
 | Editor | `editor.html` | Page organiser (multi-select, drag reorder, rotate, duplicate, delete, extract) plus export-time text, image, watermark and page-number overlays |
 | Embed | `embed.html` | Chrome-light viewer configured by 26 URL parameters, with a `postMessage` API and strict origin checks |
@@ -93,6 +93,9 @@ luma-pdf/
 | Key | Action |
 | --- | --- |
 | `←` `→` `↑` `↓`, `PageUp`/`PageDown` | Navigate pages |
+| `Space` + drag, or middle-drag | Pan the page |
+| `Ctrl/Cmd` + wheel, pinch | Zoom around the pointer |
+| Double-click | Zoom in / back to fit width |
 | `Home` / `End` | First / last page |
 | `Ctrl/Cmd + F` | Search |
 | `Ctrl/Cmd + P` | Print |
@@ -103,6 +106,9 @@ luma-pdf/
 | `F` | Fullscreen |
 | `R` | Rotate view |
 | `Z` | Distraction-free mode |
+| `H` | Hand tool |
+| `V` `S` `U` `K` `P` `M` `E` `T` `N` `B` `O` `A` `L` `G` `I` | Annotation tools (select, highlight, underline, strike, pen, marker, eraser, text, note, box, ellipse, arrow, line, image, signature) |
+| `Ctrl/Cmd + D` / `Del` | Duplicate / delete the selected annotation |
 | `Escape` | Close dialogs, search or fullscreen |
 
 Shortcuts are ignored while typing in a field and can be disabled in Settings.

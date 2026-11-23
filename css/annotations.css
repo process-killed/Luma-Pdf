@@ -1,13 +1,19 @@
-/* Annotation layer */
-.annotation-layer { position: absolute; inset: 0; z-index: 3; }
+/* Annotation layer — sized in page units and scaled by one transform, so zooming
+   never rebuilds annotation nodes. */
+.annotation-layer {
+  position: absolute; left: 0; top: 0; z-index: 3;
+  transform-origin: 0 0; touch-action: pan-x pan-y;
+  will-change: transform;
+}
+.annotation-layer[data-mode="draw"],
+.annotation-layer[data-mode="click"] { touch-action: none; }
 .annotation-layer[data-mode="draw"] { cursor: crosshair; }
 .annotation-layer[data-mode="text"] { cursor: text; }
 .annotation-layer[data-mode="erase"] { cursor: not-allowed; }
 .annotation-layer[data-mode="pan"] { pointer-events: none; }
 .annot-item { position: absolute; pointer-events: none; }
 .annotation-layer[data-selectable="true"] .annot-item { pointer-events: auto; cursor: move; }
-.annot-hl { border-radius: 2px; mix-blend-mode: multiply; }
-:root[data-theme="dark"] .annot-hl { mix-blend-mode: screen; }
+.annot-hl { border-radius: 2px; }
 .annot-underline { border-bottom-style: solid; }
 .annot-strike { text-decoration: line-through; }
 .annot-rect { border-style: solid; }
@@ -20,22 +26,26 @@
 }
 .annot-note-pop {
   position: absolute; z-index: 6; min-width: 168px; max-width: 240px; padding: 8px 10px;
+  transform: scale(var(--inv, 1)); transform-origin: top left;
   background: var(--warning-soft); color: var(--text); border: 1px solid color-mix(in srgb, var(--amber-500) 45%, transparent);
   border-radius: var(--r-sm); font-size: var(--fs-xs); line-height: 1.5; box-shadow: var(--shadow-md);
 }
-.annot-item[data-selected="true"] { outline: 1.5px dashed var(--accent); outline-offset: 2px; }
+.annot-item[data-selected="true"] { outline: calc(1.5px * var(--inv, 1)) dashed var(--accent); outline-offset: calc(2px * var(--inv, 1)); }
 .annot-handle {
-  position: absolute; width: 9px; height: 9px; background: #fff; border: 1.5px solid var(--accent);
-  border-radius: 2px; z-index: 4; display: none;
+  position: absolute; width: calc(9px * var(--inv, 1)); height: calc(9px * var(--inv, 1));
+  background: #fff; border: calc(1.5px * var(--inv, 1)) solid var(--accent);
+  border-radius: calc(2px * var(--inv, 1)); z-index: 4; display: none;
 }
 .annot-item[data-selected="true"] .annot-handle { display: block; }
-.annot-handle[data-dir="se"] { right: -5px; bottom: -5px; cursor: nwse-resize; }
-.annot-handle[data-dir="sw"] { left: -5px; bottom: -5px; cursor: nesw-resize; }
-.annot-handle[data-dir="ne"] { right: -5px; top: -5px; cursor: nesw-resize; }
-.annot-handle[data-dir="nw"] { left: -5px; top: -5px; cursor: nwse-resize; }
+.annot-handle[data-dir="se"] { right: calc(-5px * var(--inv, 1)); bottom: calc(-5px * var(--inv, 1)); cursor: nwse-resize; }
+.annot-handle[data-dir="sw"] { left: calc(-5px * var(--inv, 1)); bottom: calc(-5px * var(--inv, 1)); cursor: nesw-resize; }
+.annot-handle[data-dir="ne"] { right: calc(-5px * var(--inv, 1)); top: calc(-5px * var(--inv, 1)); cursor: nesw-resize; }
+.annot-handle[data-dir="nw"] { left: calc(-5px * var(--inv, 1)); top: calc(-5px * var(--inv, 1)); cursor: nwse-resize; }
 .annot-delete {
-  position: absolute; top: -11px; right: -11px; width: 20px; height: 20px; border-radius: 50%;
-  background: var(--danger); color: #fff; display: none; place-items: center; z-index: 5; box-shadow: var(--shadow-sm);
+  position: absolute; top: calc(-11px * var(--inv, 1)); right: calc(-11px * var(--inv, 1));
+  width: calc(20px * var(--inv, 1)); height: calc(20px * var(--inv, 1)); border-radius: 50%;
+  font-size: calc(13px * var(--inv, 1)); line-height: 1;
+  background: var(--danger); color: #fff; display: none; place-items: center; z-index: 5;
 }
 .annot-item[data-selected="true"] .annot-delete { display: grid; }
 .annot-draft { position: absolute; pointer-events: none; z-index: 5; }

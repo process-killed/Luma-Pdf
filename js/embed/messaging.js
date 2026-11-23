@@ -4,6 +4,7 @@
  * - Nothing received is ever evaluated as code.
  */
 import { isKnownCommand, sanitizeMessagePayload, originAllowed, parseAllowedOrigins } from '../utils/security.js';
+import { APP } from '../config.js';
 
 export const EVENTS = [
   'luma:ready', 'luma:loaded', 'luma:error', 'luma:pageChanged', 'luma:zoomChanged',
@@ -82,7 +83,7 @@ export class EmbedBridge {
     if (window.parent === window) return;
     const target = this.parentOrigin || this.allowOrigins[0] || location.origin;
     try {
-      window.parent.postMessage({ type, detail, version: '1.0.0' }, target);
+      window.parent.postMessage({ type, detail, version: APP.version }, target);
     } catch { /* ignore */ }
   }
 }
