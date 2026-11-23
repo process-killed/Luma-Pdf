@@ -4,6 +4,7 @@
 import { boot } from '../app.js';
 import { DocumentEditor } from '../editor/document-editor.js';
 import { PageEditor } from '../editor/page-editor.js';
+import { loadPdfLib } from '../utils/pdflib.js';
 import { addTextOverlay, addWatermarkOverlay, addPageNumbersOverlay } from '../editor/text-editor.js';
 import { addImageOverlay } from '../editor/image-editor.js';
 import { toast, dialog, confirmDialog, setBusy, initMenus } from '../ui/ui.js';

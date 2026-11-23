@@ -74,6 +74,9 @@ export class Viewer {
     this.attachInteractions();
     this.stack.style.setProperty('--page-gap', `${this.gap}px`);
     if (startPage > 1) this.goToPage(startPage, { smooth: false, silent: true });
+    // A cheap preview lands in a fraction of the time of a sharp render; the sharp
+    // pass follows immediately after it, so the page is readable before it is perfect.
+    this.requestRender(this.current, false, 'preview');
     this.renderVisible(true);
     lap('scheduleFirstRender');
     if (restoreScroll) {
@@ -83,11 +86,15 @@ export class Viewer {
       });
     }
     this.onEvent('ready', { pages: this.doc.numPages, scale: this.scale });
-    setTimeout(() => { this.measureRemaining(); }, 400);
     return this;
   }
 
   /* ---------- Sizes ---------- */
+  /**
+   * Only page 1 is measured before the first paint. Every other page keeps that size
+   * until it comes near the viewport, so opening a 500-page document costs one worker
+   * call instead of five hundred.
+   */
   async measureSizes() {
     const n = this.doc.numPages;
     let base = { width: 612, height: 792 };
@@ -97,33 +104,31 @@ export class Viewer {
       base = { width: vp.width, height: vp.height };
     } catch { /* letter fallback */ }
     this.sizes = new Array(n).fill(base);
+    this.sizesKnown = new Uint8Array(n);
+    this.sizesKnown[0] = 1;
   }
 
-  async measureRemaining() {
-    const n = this.doc.numPages;
-    if (n < 2 || n > 800 || this.destroyed) return;
-    const chunk = 16;
-    for (let start = 2; start <= n; start += chunk) {
-      if (this.destroyed) return;
-      const nums = [];
-      for (let i = start; i < Math.min(n + 1, start + chunk); i++) nums.push(i);
-      await Promise.all(nums.map(async (num) => {
-        try {
-          const p = await this.doc.getPage(num);
-          const vp = p.getViewport({ scale: 1, rotation: 0 });
-          this.sizes[num - 1] = { width: vp.width, height: vp.height };
-        } catch { /* keep default */ }
-      }));
-      nums.forEach((num) => {
-        const pv = this.pages[num - 1];
+  /** Measure the real size of pages in a window — parallel, once each. */
+  async ensureSizesAround(first, last) {
+    if (this.destroyed || !this.sizesKnown) return;
+    const from = Math.max(1, first - 4);
+    const to = Math.min(this.pages.length, last + 4);
+    const pending = [];
+    for (let i = from; i <= to; i++) {
+      if (this.sizesKnown[i - 1]) continue;
+      this.sizesKnown[i - 1] = 1;
+      pending.push(this.doc.getPage(i).then((page) => {
+        const vp = page.getViewport({ scale: 1, rotation: 0 });
+        this.sizes[i - 1] = { width: vp.width, height: vp.height };
+        const pv = this.pages[i - 1];
         if (pv && !pv.rendered) {
-          pv.baseSize = this.sizes[num - 1];
+          pv.baseSize = this.sizes[i - 1];
           pv.applySize(this.scale);
         }
-      });
-      await new Promise((r) => setTimeout(r, 0));
+      }).catch(() => { /* keep the default */ }));
     }
-    // One refresh after all sizes are known, rather than one per chunk.
+    if (!pending.length) return;
+    await Promise.all(pending);
     this._metricsDirty = true;
     if (!this.destroyed) this.updateMetrics();
   }
@@ -432,31 +437,45 @@ export class Viewer {
 
     this.visible.clear();
     for (let i = first; i <= last; i++) this.visible.add(i + 1);
+    if (first !== this._sizeWindow?.[0] || last !== this._sizeWindow?.[1]) {
+      this._sizeWindow = [first, last];
+      this.ensureSizesAround(first, last).catch(() => {});
+    }
 
     const busy = !force && (performance.now() - (this._lastScrollAt || 0) < 110);
     for (let i = first; i <= last; i++) {
-      // While a scroll is in flight only the page under the reader is rendered;
-      // starting renders for pages that are about to fly past wastes frames.
-      if (busy && i + 1 !== this.current) continue;
-      this.requestRender(i + 1, force);
+      const num = i + 1;
+      if (busy) {
+        // Scrolling: a cheap preview of the page under the reader only. Pages that are
+        // about to fly past are not worth a single device pixel.
+        if (num === this.current) this.requestRender(num, false, 'preview');
+        continue;
+      }
+      this.requestRender(num, force);
     }
     if (busy) {
       clearTimeout(this._scrollRenderTimer);
       this._scrollRenderTimer = setTimeout(() => {
         if (!this.destroyed) this.renderVisible(true);
-      }, 140);
+      }, 120);
     }
     this.trimCache();
   }
 
-  requestRender(num, force = false) {
+  requestRender(num, force = false, quality = 'full') {
     const pv = this.pages[num - 1];
     if (!pv || this.destroyed) return;
     if (pv.rendering) return;
-    if (pv.rendered && !pv.stale && !force) return;
+    if (quality === 'preview') {
+      if (pv.rendered) return;                 // a preview is only worth it on a blank page
+    } else if (pv.rendered && !pv.stale && !force && pv.quality === 'full') {
+      return;
+    }
     this.queue.run(async () => {
       if (this.destroyed) return;
-      if (pv.rendered && !pv.stale && !force) return;
+      if (quality === 'full' && !this.visible.has(num) && !force && pv.quality !== 'full') return;
+      if (quality === 'preview' && pv.rendered) return;
+      if (quality === 'full' && pv.rendered && !pv.stale && !force && pv.quality === 'full') return;
       if (!pv.wrap) {
         // The real node replaces a placeholder of identical size, so layout (and the
         // cached metrics) stay valid — no forced re-measure while scrolling.
@@ -464,14 +483,18 @@ export class Viewer {
         pv.mountInto(parent);
         pv.applySize(this.scale);
       }
-      await pv.render(this.doc, { scale: this.scale, profile: this.profile, dpr: this.dpr });
+      await pv.render(this.doc, { scale: this.scale, profile: this.profile, dpr: this.dpr, quality });
       this.renderedOrder = this.renderedOrder.filter((n) => n !== num);
       this.renderedOrder.push(num);
       this.trimCache();
       // Selectable text appears right after the pixels, so the first page is
       // searchable/selectable without waiting for a zoom.
-      if (!this.zooming) pv.ensureTextLayer(this.doc, this.scale);
-      this.onEvent('pageRendered', { page: num });
+      if (!this.zooming && quality !== 'preview') pv.ensureTextLayer(this.doc, this.scale);
+      this.onEvent('pageRendered', { page: num, quality });
+      // A preview is a stopgap: sharpen it once the main thread has a moment.
+      if (quality === 'preview' && this.visible.has(num) && !this.zooming) {
+        setTimeout(() => { if (!this.destroyed) this.requestRender(num, true, 'full'); }, 40);
+      }
     }).catch((e) => console.warn('render queue', e));
   }
 

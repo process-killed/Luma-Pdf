@@ -10,7 +10,23 @@ export function detectDevice() {
     (info.connection && ['slow-2g', '2g'].includes(info.connection.type)) ||
     (info.connection && info.connection.saveData)
   );
-  return { ...info, weak, supports };
+  let isMobile = false;
+  try {
+    isMobile = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+      Math.min(window.innerWidth, window.innerHeight) < 560;
+  } catch { /* desktop */ }
+  return { ...info, weak, isMobile, supports };
+}
+
+/** Phones and tablets render fewer pixels: the eye cannot tell at 400 ppi. */
+export function mobileCap(profile, info = detectDevice()) {
+  if (!info.isMobile) return profile;
+  return {
+    ...profile,
+    maxDevicePixelRatio: Math.min(profile.maxDevicePixelRatio, 1.5),
+    maxCanvasPixels: Math.min(profile.maxCanvasPixels, 3_000_000),
+    cachePages: Math.min(profile.cachePages, 3)
+  };
 }
 
 export function recommendProfile(info = detectDevice()) {

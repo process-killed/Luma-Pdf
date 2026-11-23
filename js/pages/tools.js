@@ -7,6 +7,7 @@ import { toast, dialog, confirmDialog, setBusy, initMenus } from '../ui/ui.js';
 import { downloadBlob, formatBytes, isPdfFile } from '../utils/files.js';
 import { CATEGORIES, TOOLS, getTool, toolsByCategory, toolCount } from '../tools/catalog.js';
 import { currentProfile } from '../app.js';
+import { loadPdfLib } from '../utils/pdflib.js';
 
 const S = { files: [], signatureFile: null, tool: null, result: null, urls: [], running: false };
 
@@ -370,6 +371,9 @@ async function runTool() {
   S.running = true;
   const runBtn = document.getElementById('run-btn');
   setBusy(runBtn, true, 'Working');
+  // pdf-lib is loaded on demand so the page opens fast; every tool that needs it
+  // gets it here, once.
+  await loadPdfLib().catch(() => {});
   const progressHost = document.getElementById('progress-host');
   const bar = document.getElementById('progress-bar');
   const label = document.getElementById('progress-label');

@@ -2,7 +2,7 @@
 import { initSettings, store } from './state.js';
 import { initTheme } from './theme.js';
 import { mountShell } from './shell.js';
-import { detectDevice, recommendProfile, profileConfig } from './performance/device-detection.js';
+import { detectDevice, recommendProfile, profileConfig, mobileCap } from './performance/device-detection.js';
 import { initInstall } from './pwa/install.js';
 import { registerServiceWorker } from './pwa/updates.js';
 import { saveDocument } from './storage/library.js';
@@ -20,15 +20,22 @@ export async function boot({ active = '', minimal = false, serviceWorker = true 
   document.documentElement.dataset.detectedProfile = profileName;
   document.documentElement.dataset.performance = profileName;
   initTheme();
-  mountShell({ active, minimal });
+  // The viewer ships its own chrome; mounting the marketing header would cost layout
+  // work on the critical path for nothing.
+  if (active !== 'viewer') mountShell({ active, minimal });
   initInstall();
-  if (serviceWorker) registerServiceWorker();
-  return { profile: profileConfig(profileName) };
+  // Registration and the offline warm-up compete for CPU with the first page, so they
+  // wait until the browser is idle.
+  if (serviceWorker) {
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1800));
+    idle(() => registerServiceWorker(), { timeout: 5000 });
+  }
+  return { profile: mobileCap(profileConfig(profileName), device) };
 }
 
 export function currentProfile() {
   const chosen = store.get('performanceProfile');
-  return profileConfig(chosen && chosen !== 'auto' ? chosen : recommendProfile(device));
+  return mobileCap(profileConfig(chosen && chosen !== 'auto' ? chosen : recommendProfile(device)), device);
 }
 
 /* ---------- Opening documents ---------- */

@@ -7,7 +7,20 @@
 const VENDOR = new URL('../../vendor/pdfjs/', import.meta.url);
 const WORKER_URL = new URL('pdf.worker.min.js', VENDOR).href;
 
+import { mark } from '../utils/marks.js';
+
 let readyPromise = null;
+
+/** Boot the PDF.js worker before a document is even chosen. */
+export function warmWorker() {
+  return engineReady().then((lib) => {
+    try {
+      if (!lib.__lumaWarm && typeof lib.PDFWorker === 'function') {
+        lib.__lumaWarm = new lib.PDFWorker({ name: 'luma-warm' });
+      }
+    } catch { /* the worker is optional; getDocument starts one anyway */ }
+  }).catch(() => {});
+}
 
 export function engineReady() {
   if (readyPromise) return readyPromise;
@@ -72,16 +85,72 @@ export async function openFromFile(file, opts = {}) {
  * Open a remote PDF. Uses PDF.js range requests when the server supports them.
  * CORS failures are reported explicitly rather than as a generic error.
  */
+/**
+ * Fetch the bytes ourselves and hand them to PDF.js.
+ *
+ * Two reasons: the download then starts at the same moment the worker boots instead of
+ * after it, and progress reporting works in every browser (PDF.js only reports it in
+ * some). Very large files fall back to PDF.js's own streaming loader.
+ */
+async function fetchBytes(url, onProgress) {
+  mark('pdf-fetch');
+  const res = await fetch(url, { credentials: 'same-origin', mode: 'cors' });
+  if (!res.ok) {
+    const error = new Error(`HTTP ${res.status}`);
+    error.name = res.status === 404 ? 'MissingPDFException' : 'UnexpectedResponseException';
+    throw error;
+  }
+  const type = res.headers.get('content-type') || '';
+  const total = Number(res.headers.get('content-length') || 0);
+  if (total > 120 * 1024 * 1024) return null;      // let PDF.js stream it instead
+  if (!res.body || !res.body.getReader) {
+    const buffer = await res.arrayBuffer();
+    onProgress?.(1, buffer.byteLength, buffer.byteLength);
+    return new Uint8Array(buffer);
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onProgress?.(total ? loaded / total : 0.5, loaded, total);
+  }
+  const bytes = new Uint8Array(loaded);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  if (!bytes.length || (type && !/pdf|octet-stream/i.test(type))) {
+    const error = new Error('Not a PDF');
+    error.name = 'InvalidPDFException';
+    throw error;
+  }
+  onProgress?.(1, loaded, loaded);
+  mark('pdf-bytes');
+  return bytes;
+}
+
 export async function openFromUrl(url, { onProgress, password } = {}) {
   const lib = await engineReady();
-  const task = lib.getDocument({ url, ...engineConfig(), withCredentials: false, password: password || undefined });
-  if (onProgress && task.onProgress) {
-    task.onProgress = ({ loaded, total }) => onProgress(total ? loaded / total : 0, loaded, total);
+  let bytes = null;
+  try {
+    bytes = await fetchBytes(url, onProgress);
+  } catch (err) {
+    // CORS or a network failure: let PDF.js try with its own loader so its error
+    // message (and its retry behaviour) is what the user sees.
+    if (!/HTTP|Not a PDF/.test(err.message)) bytes = null;
+    else throw enrichError(err, { url });
   }
   try {
+    const task = bytes
+      ? lib.getDocument({ data: bytes, ...engineConfig(), worker: lib.__lumaWarm, password: password || undefined })
+      : lib.getDocument({ url, ...engineConfig(), worker: lib.__lumaWarm, withCredentials: false, password: password || undefined });
+    mark('pdf-parse-start');
     const doc = await task.promise;
+    mark('pdf-parsed');
     doc.__task = task;
-    doc.__source = { kind: 'url', url };
+    doc.__source = { kind: 'url', url, bytes };
     return doc;
   } catch (err) {
     throw enrichError(err, { url });

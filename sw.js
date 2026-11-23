@@ -1,16 +1,14 @@
 /* Luma PDF service worker — offline application shell.
    Documents you save are stored by the page in IndexedDB, not here. */
-const VERSION = 'luma-pdf-v1.1.0';
+const VERSION = 'luma-pdf-v1.2.0';
 const SHELL_CACHE = VERSION + '-shell';
 const RUNTIME_CACHE = VERSION + '-runtime';
 
-const SHELL = [
+// Cached during install: the app shell only, so the first load is fast.
+// Cached during install: pages and styles only (~150 KB), so a first visit is fast.
+// Cached during install: pages and styles only (~150 KB), so a first visit is fast.
+const CORE = [
   './about.html',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png',
-  './assets/icons/icon-maskable-512.png',
-  './assets/icons/logo-maskable.svg',
-  './assets/icons/logo.svg',
   './css/animations.css',
   './css/annotations.css',
   './css/editor.css',
@@ -26,7 +24,6 @@ const SHELL = [
   './css/toolbar.css',
   './css/tools.css',
   './css/viewer.css',
-  './deployment/vercel.json',
   './docs.html',
   './editor.html',
   './embed-generator.html',
@@ -35,6 +32,25 @@ const SHELL = [
   './index.html',
   './js/app.js',
   './js/config.js',
+  './js/shell.js',
+  './js/state.js',
+  './js/theme.js',
+  './library.html',
+  './manifest.json',
+  './offline.html',
+  './settings.html',
+  './tools.html',
+  './viewer.html',
+];
+
+// Everything else is warmed quietly after install.
+const EXTRA = [
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png',
+  './assets/icons/icon-maskable-512.png',
+  './assets/icons/logo-maskable.svg',
+  './assets/icons/logo.svg',
+  './deployment/vercel.json',
   './js/editor/document-editor.js',
   './js/editor/export.js',
   './js/editor/image-editor.js',
@@ -58,13 +74,10 @@ const SHELL = [
   './js/performance/memory-manager.js',
   './js/pwa/install.js',
   './js/pwa/updates.js',
-  './js/shell.js',
-  './js/state.js',
   './js/storage/cache.js',
   './js/storage/database.js',
   './js/storage/history.js',
   './js/storage/library.js',
-  './js/theme.js',
   './js/tools/catalog.js',
   './js/tools/compress.js',
   './js/tools/convert.js',
@@ -83,6 +96,8 @@ const SHELL = [
   './js/utils/browser.js',
   './js/utils/dom.js',
   './js/utils/files.js',
+  './js/utils/marks.js',
+  './js/utils/pdflib.js',
   './js/utils/security.js',
   './js/utils/urls.js',
   './js/utils/zip.js',
@@ -97,27 +112,35 @@ const SHELL = [
   './js/viewer/thumbnails.js',
   './js/viewer/toolbar.js',
   './js/viewer/viewer.js',
-  './library.html',
-  './manifest.json',
-  './offline.html',
-  './settings.html',
-  './tools.html',
   './vendor/pdf-lib/pdf-lib.min.js',
   './vendor/pdfjs/pdf.min.js',
   './vendor/pdfjs/pdf.worker.min.js',
   './vendor/qpdf/qpdf.js',
   './vendor/qpdf/qpdf.wasm',
-  './viewer.html',
 ];
+const SHELL = [...CORE, ...EXTRA];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
-    // addAll fails the whole install if one file 404s, so add individually.
-    await Promise.all(SHELL.map((url) => cache.add(url).catch(() => null)));
+    // Shell first: a handful of small files, so installation never blocks the first page.
+    await Promise.all(CORE.map((url) => cache.add(url).catch(() => {})));
     self.skipWaiting();
+    // Engine bundles are warmed in the background; the page never waits for them.
+    warmExtra(cache);
   })());
 });
+
+/** Fill the rest of the shell cache quietly, one file at a time. */
+async function warmExtra(cache) {
+  for (const url of EXTRA) {
+    try {
+      if (await cache.match(url)) continue;
+      await cache.add(url);
+    } catch { /* offline or missing — try again on the next visit */ }
+    await new Promise((r) => setTimeout(r, 40));
+  }
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {

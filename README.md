@@ -2,9 +2,24 @@
 
 A universal PDF workspace that runs entirely in the browser: read, search, annotate, edit, convert, and embed PDFs without uploading anything.
 
-**v1.1.0** · static files · no build step · no backend · no account
+**v1.2.0** · static files · no build step · no backend · no account
 
 ---
+
+## Performance notes
+
+* The first page paints from a low-resolution preview, then sharpens — you never wait for
+  a full-quality render to start reading.
+* pdf-lib (525 KB) is only loaded when you edit, fill a form or export; viewing never pays
+  for it.
+* Page geometry, thumbnails, the outline and form detection are all deferred until after
+  the first page.
+* While scrolling fast, only the page under the reader is rendered, at reduced resolution;
+  the sharp pass follows when you stop.
+* Phones render at a capped pixel budget (1.5× DPR, 3 MP/page), which is invisible on a
+  small screen and roughly halves the work per page.
+* Open `performance` marks in DevTools (`luma:module`, `luma:pdf-parsed`,
+  `luma:first-page`) to see exactly where time goes on your own device.
 
 ## What it does
 

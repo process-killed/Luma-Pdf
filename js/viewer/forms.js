@@ -140,6 +140,7 @@ export class FormLayer {
     layer.style.height = `${pv.baseSize.height}px`;
     layer.style.transform = `scale(${s})`;
     layer.style.transformOrigin = '0 0';
+    layer.style.setProperty('--form-scale', String(s));
   }
 
   renderPage(num) {

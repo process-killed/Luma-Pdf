@@ -113,17 +113,19 @@ export class PageView {
   applySize(scale = this.scale) {
     const changed = Math.abs(scale - this.scale) > 0.0001;
     this.scale = scale;
-    if (!this.wrap) return;
     const w = Math.max(1, Math.round(this.baseSize.width * scale));
     const h = Math.max(1, Math.round(this.baseSize.height * scale));
     this.cssWidth = w;
     this.cssHeight = h;
-    this.wrap.style.width = `${w}px`;
-    this.wrap.style.height = `${h}px`;
+    // A page that is not mounted still has a placeholder: keep it exactly the size of
+    // the real page, otherwise the stack (and the whole layout) is measured wrong.
     if (this.placeholder) {
       this.placeholder.style.width = `${w}px`;
       this.placeholder.style.height = `${h}px`;
     }
+    if (!this.wrap) return;
+    this.wrap.style.width = `${w}px`;
+    this.wrap.style.height = `${h}px`;
 
     if (this.canvas && this.canvas.width > 0) {
       this.canvas.style.width = `${w}px`;
@@ -151,10 +153,20 @@ export class PageView {
   }
 
   /** Render the canvas only. The text layer is built separately by the viewer. */
-  async render(doc, { scale, profile, dpr }) {
+  async render(doc, { scale, profile, dpr, quality = 'full' }) {
     if (this.rendering) return this.rendering;
     const page = await this.ensurePage(doc);
-    const plan = computeRenderPlan(this.baseSize, this.baseSize.width * scale, profile, dpr);
+    const previewDpr = quality === 'preview' ? Math.min(1, 0.55) : dpr;
+    const plan = computeRenderPlan(this.baseSize, this.baseSize.width * scale, profile, previewDpr);
+    if (quality === 'preview') {
+      // Cap the preview at roughly a quarter of the pixels of a full render.
+      const capPixels = 900_000;
+      if (plan.pixels > capPixels) {
+        const k = Math.sqrt(capPixels / plan.pixels);
+        plan.ratio = Math.max(0.2, plan.ratio * k);
+        plan.pixels = plan.pixels * k * k;
+      }
+    }
     const rotation = this.rotation;
     const token = (this.renderToken = (this.renderToken || 0) + 1);
 
@@ -174,6 +186,7 @@ export class PageView {
         this.cssHeight = plan.cssHeight;
         this.rendered = true;
         this.stale = false;
+        this.quality = quality;
         this.wrap.classList.add('rendered');
         this.wrap.dataset.stale = 'false';
         this.redrawSearch();

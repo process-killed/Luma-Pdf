@@ -44,3 +44,105 @@
 @supports (padding: max(0px)) {
   .site-header { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 }
+
+/* =========================================================================
+   Mobile-first corrections (v1.2)
+   ========================================================================= */
+
+/* Toolbar: only the essentials on a phone; everything else lives in the ⋮ menu. */
+@media (max-width: 700px) {
+  .viewer-toolbar {
+    padding-left: max(6px, env(safe-area-inset-left));
+    padding-right: max(6px, env(safe-area-inset-right));
+    padding-top: max(0px, env(safe-area-inset-top));
+    gap: 2px;
+  }
+  .viewer-toolbar [data-act="pan"],
+  .viewer-toolbar [data-act="annotations"],
+  .viewer-toolbar [data-act="download"],
+  .viewer-toolbar [data-act="print"],
+  .viewer-toolbar [data-act="fullscreen"],
+  .viewer-toolbar [data-act="zen"],
+  .viewer-toolbar [data-act="view-menu"],
+  .viewer-toolbar .tb-sep,
+  .viewer-toolbar .tb-title { display: none !important; }
+  .viewer-toolbar .tb-zoom { min-width: 0; }
+  .viewer-toolbar .tb-zoom .tb-btn,
+  .viewer-toolbar .tb-zoom .zoom-btn { display: none; }
+  .viewer-toolbar .tb-zoom .zoom-value {
+    min-width: 40px; padding: 0 2px; height: 36px;
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .viewer-toolbar .tb-btn { width: 40px; height: 40px; }
+  .viewer-toolbar .page-input { width: 34px; height: 34px; }
+  .viewer-toolbar .page-total { display: none; }
+  .viewer-toolbar .tb-nav { gap: 0; }
+}
+
+/* Annotation palette: a thumb-friendly sheet instead of a scrolling strip. */
+@media (max-width: 860px) {
+  .annot-bar {
+    position: fixed; left: 8px; right: 8px; transform: none;
+    top: auto; bottom: calc(66px + env(safe-area-inset-bottom));
+    border-radius: var(--r-lg);
+    flex-wrap: wrap; justify-content: center; gap: 4px;
+    padding: 10px 8px 8px; max-height: 42dvh; overflow-y: auto;
+    box-shadow: var(--shadow-lg); z-index: 40;
+  }
+  .annot-bar::before {
+    content: ''; position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+    width: 36px; height: 3px; border-radius: 2px; background: var(--surface-border-strong);
+  }
+  .annot-bar .tb-btn { width: 44px; height: 44px; border-radius: var(--r-md); }
+  .annot-bar .tb-sep { display: none; }
+  .annot-bar .swatches { gap: 6px; }
+  .annot-bar .swatch { width: 26px; height: 26px; }
+  .annot-bar input[type="range"] { width: 84px; }
+}
+
+/* Bottom bars respect the home indicator. */
+.mobile-bar { padding-bottom: max(6px, env(safe-area-inset-bottom)); height: auto; min-height: 56px; }
+.mobile-bar .tb-btn { width: 44px; height: 44px; }
+.workspace { padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
+
+/* Dialogs become bottom sheets on small screens. */
+@media (max-width: 640px) {
+  dialog.modal {
+    position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; max-width: 100%;
+    max-height: 88dvh; border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+    animation: sheet-in var(--dur-3) var(--ease-out);
+  }
+  dialog.modal .modal-body { max-height: 62dvh; overflow-y: auto; }
+  dialog.modal .modal-foot { flex-wrap: wrap; }
+  dialog.modal .modal-foot .btn { flex: 1 1 auto; }
+  @keyframes sheet-in { from { transform: translateY(14px); opacity: .6; } to { transform: none; opacity: 1; } }
+}
+
+/* Forms: 16px inputs stop iOS from zooming the page on focus. */
+@media (pointer: coarse) {
+  .form-input { font-size: max(11px, calc(16px / var(--form-scale, 1))) !important; }
+}
+
+/* Documentation: no page can be wider than the screen. */
+@media (max-width: 860px) {
+  .doc-body { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  .doc-body table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .doc-body pre { max-width: 100%; overflow-x: auto; }
+  .docs-layout { grid-template-columns: minmax(0, 1fr); }
+  .docs-nav { flex-wrap: wrap; overflow-x: visible; min-width: 0; }
+  .prose, .doc-body { min-width: 0; }
+  .prose table, .doc-body table { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .prose pre, .doc-body pre { max-width: 100%; overflow-x: auto; }
+  .gen-grid { grid-template-columns: minmax(0, 1fr); }
+  .gen-grid > *, .stack-4, .panel { min-width: 0; }
+}
+
+/* Small screens: tighter type and padding everywhere. */
+@media (max-width: 420px) {
+  .container { padding: 0 14px; }
+  .hero h1 { font-size: clamp(1.9rem, 8vw, 2.4rem); }
+  .tool-grid { grid-template-columns: 1fr; }
+  .page-head h1 { font-size: 1.5rem; }
+  .btn { height: 42px; }
+}

@@ -8,13 +8,13 @@ export const APP = {
   tagline: 'A universal PDF workspace that runs entirely in your browser.',
   origin: (typeof location !== 'undefined' ? location.origin + location.pathname.replace(/\/[^/]*$/, '/') : 'https://lumapdf.example/'),
   repo: 'https://github.com/',
-  version: '1.1.0',
-  build: '2026-11-23 13:20 IST',
-  buildId: 'b2026-11-23-1'
+  version: '1.2.0',
+  build: '2026-11-23 19:05 IST',
+  buildId: 'b2026-11-23-3'
 };
 
 /** Asset version query — bump together with APP.version on every real change. */
-export const ASSET_V = '1.1.0';
+export const ASSET_V = '1.2.0';
 
 export const PATHS = {
   pdfjs: 'vendor/pdfjs/pdf.min.js',

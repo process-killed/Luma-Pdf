@@ -5,6 +5,7 @@
 import { openForRender } from '../tools/pdf-utils.js';
 import { uid } from '../utils/files.js';
 import { buildPdf } from './export.js';
+import { loadPdfLib } from '../utils/pdflib.js';
 
 export class DocumentEditor {
   constructor() {
@@ -156,6 +157,7 @@ export class DocumentEditor {
   }
 
   async export({ filename } = {}) {
+    await loadPdfLib();
     if (!this.pages.length) throw new Error('There are no pages to export.');
     const blob = await buildPdf(this, { onProgress: this.onProgress });
     return { blob, filename: filename || this.suggestName() };

@@ -2,24 +2,39 @@
  * Viewer page — wires the PDF engine, viewer, toolbar, sidebar, search and annotations.
  */
 import { boot } from '../app.js';
+import { APP } from '../config.js';
 import { store } from '../state.js';
 import { ANNOTATION_TOOLS, ANNOTATION_COLORS, ZOOM_STEPS, FILE_LIMITS } from '../config.js';
 import { icon } from '../ui/icons.js';
 import { toast, dialog, confirmDialog, promptDialog, initMenus, copyText, setBusy } from '../ui/ui.js';
 import { downloadBlob, pdfName, canvasToBlob, formatBytes, sanitizeFilename } from '../utils/files.js';
 import { normalizeUrl, filenameFromUrl, getParams, parseIntSafe } from '../utils/urls.js';
-import { openFromFile, openFromUrl, openFromBytes, getOutline, getDocumentInfo, pageText, documentText, enrichError, errorCode, renderPageOffscreen } from '../viewer/pdf-engine.js';
+import { openFromFile, openFromUrl, openFromBytes, getOutline, getDocumentInfo, pageText, documentText, enrichError, errorCode, renderPageOffscreen, engineReady, warmWorker } from '../viewer/pdf-engine.js';
 import { Viewer } from '../viewer/viewer.js';
-import { SearchController } from '../viewer/search.js';
-import { ThumbnailPanel } from '../viewer/thumbnails.js';
-import { AnnotationManager } from '../viewer/annotations.js';
+// Heavy, feature-only modules are imported on demand (see loadFeature).
+
+
 import { Toolbar } from '../viewer/toolbar.js';
 import { KeyController } from '../viewer/keyboard.js';
-import { BookmarkStore } from '../viewer/navigation.js';
-import { FormLayer } from '../viewer/forms.js';
-import { openSignatureLibrary } from '../viewer/signatures.js';
+
+
+
+import { loadPdfLib } from '../utils/pdflib.js';
+import { mark } from '../utils/marks.js';
 import { getDocument, saveDocument, getAnnotations, saveAnnotations, getBookmarks, saveBookmarks, getReadingState, saveReadingState, touchDocument } from '../storage/library.js';
 import { currentProfile } from '../app.js';
+
+mark('module');
+// Boot the PDF.js worker before anything else needs it.
+warmWorker?.();
+// pdf-lib (525 KB) is fetched only when a feature needs it — never on open.
+
+/** Load a feature module the first time it is needed. */
+const featureCache = new Map();
+function loadFeature(path) {
+  if (!featureCache.has(path)) featureCache.set(path, import(path));
+  return featureCache.get(path);
+}
 
 const S = {
   doc: null, docKey: null, docName: '', source: null, blob: null,
@@ -46,20 +61,24 @@ async function main() {
   els.mobilePage = document.getElementById('mobile-page');
   els.mobileTotal = document.getElementById('mobile-total');
 
+  const params = getParams();
+  // Kick the document off first: its download and parse overlap with the UI boot.
+  const preOpen = params.get('file')
+    ? openFromUrl(params.get('file')).catch((err) => ({ __error: err }))
+    : null;
+
   S.profile = (await boot({ active: 'viewer' })).profile;
 
   buildToolbar();
-  buildAnnotBar();
   wireSidebar();
   wireMobile();
   wireGlobalDrop();
   initMenus();
 
-  const params = getParams();
   if (params.get('doc')) {
     await openFromLibrary(params.get('doc'));
   } else if (params.get('file')) {
-    await openRemote(params.get('file'), { page: parseIntSafe(params.get('page'), 0) });
+    await openRemote(params.get('file'), { page: parseIntSafe(params.get('page'), 0), preOpen });
   } else {
     showEmptyState();
   }
@@ -116,6 +135,20 @@ function buildToolbar() {
   S.toolbar.setMode(store.get('mode') || 'vertical');
 }
 
+/** Cheap byte sniff: a PDF with form fields mentions /AcroForm in its objects. */
+function hasAcroForm(bytes) {
+  if (!bytes || !bytes.length) return false;
+  const probe = bytes.length > 2_000_000 ? bytes.subarray(0, 2_000_000) : bytes;
+  let text = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < probe.length; i += chunk) {
+    text += String.fromCharCode.apply(null, probe.subarray(i, i + chunk));
+    if (text.includes('/AcroForm')) return true;
+    if (text.length > 4_000_000) text = text.slice(-2000);
+  }
+  return false;
+}
+
 function togglePan() {
   if (!S.viewer) return;
   const on = !S.viewer.panMode;
@@ -127,10 +160,24 @@ function togglePan() {
     : 'Hand tool off', { duration: 2400 });
 }
 
+/**
+ * Form detection is deferred: parsing the whole document with pdf-lib costs more than
+ * the first page render on a phone. We sniff the raw bytes for an /AcroForm entry first,
+ * then do the real work on idle.
+ */
 async function loadForms() {
-  if (!S.doc || !window.PDFLib) return;
+  if (!S.doc) return;
   try {
     const bytes = await sourceBytes();
+    // A quick byte sniff catches most files; object streams hide /AcroForm, so small
+    // documents are checked properly as well (large ones are not worth the parse).
+    const worthParsing = hasAcroForm(bytes) || bytes.length < 25 * 1024 * 1024;
+    if (!worthParsing) return;
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 600));
+    await new Promise((resolve) => idle(resolve, { timeout: 1500 }));
+    if (S.forms || !S.doc) return;
+    await loadPdfLib();
+    const { FormLayer } = await loadFeature('../viewer/forms.js');
     S.forms = new FormLayer({
       viewer: S.viewer,
       onChange: (form) => paintFormBar(form)
@@ -187,6 +234,7 @@ function paintFormBar(form) {
 
 async function saveFilledForm() {
   if (!S.forms?.hasFields) return;
+  await loadPdfLib();
   const body = document.createElement('div');
   body.innerHTML = `<p class="small muted" style="line-height:1.6">The values are written into a new copy of the PDF. Your original file is untouched.</p>
     <label class="checkbox" style="margin-top:12px"><input type="checkbox" id="form-flatten" checked> Flatten the form (recommended — every reader then shows the values)</label>
@@ -305,6 +353,7 @@ function buildAnnotBar() {
 
 function useTool(id) {
   if (!S.annots) return;
+  ensureAnnotBar();
   if (els.annotBar.dataset.open !== 'true') {
     els.annotBar.dataset.open = 'true';
     S.toolbar?.setAnnotPressed(true);
@@ -336,6 +385,12 @@ function switchTab(name, { userInitiated = false } = {}) {
   if (name === 'annotations') renderAnnotList();
   if (name === 'info') renderInfo();
   if (userInitiated) openSidebarMobile();
+}
+
+function isSidebarVisible() {
+  const mobile = window.matchMedia('(max-width: 860px)').matches;
+  if (mobile) return els.sidebar.dataset.open === 'true';
+  return els.sidebar.dataset.collapsed !== 'true';
 }
 
 function toggleSidebar() {
@@ -479,7 +534,7 @@ async function openFromLibrary(id) {
   }
 }
 
-async function openRemote(rawUrl, { page = 0 } = {}) {
+async function openRemote(rawUrl, { page = 0, preOpen = null } = {}) {
   const url = normalizeUrl(rawUrl);
   if (!url) {
     toast('Enter a full http:// or https:// link to a PDF.', { type: 'error' });
@@ -491,8 +546,10 @@ async function openRemote(rawUrl, { page = 0 } = {}) {
   S.source = { kind: 'url', url };
   S.blob = null;
   showLoading(name, 0);
+  mark('doc-request');
   try {
-    const doc = await openFromUrl(url, { onProgress: (p) => showLoading(name, p) });
+    const doc = preOpen ? await preOpen : await openFromUrl(url, { onProgress: (p) => showLoading(name, p) });
+    if (doc && doc.__error) throw doc.__error;
     await onDocumentReady(doc, { name, page });
   } catch (err) {
     const enriched = enrichError(err, { url });
@@ -519,8 +576,7 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   els.status.hidden = true;
 
   let info = null;
-  try { info = await getDocumentInfo(doc); } catch { /* optional */ }
-  S.info = info;
+  const infoPromise = getDocumentInfo(doc).catch(() => null);
 
   const restore = store.get('restorePosition') ? await getReadingState(S.docKey).catch(() => null) : null;
   const startPage = page || restore?.page || 1;
@@ -536,7 +592,9 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
     gap: store.get('gap') || 14,
     onEvent: onViewerEvent
   });
+  mark('viewer-init-start');
   await S.viewer.init({ startPage });
+  mark('viewer-init');
 
   S.toolbar.setDocument(name || info?.title || 'Untitled document', `${doc.numPages} pages${size ? ' · ' + formatBytes(size) : ''}`);
   S.toolbar.setMode(S.viewer.mode);
@@ -545,12 +603,14 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   els.mobileTotal.textContent = '/ ' + doc.numPages;
   els.mobilePage.value = String(S.viewer.current);
 
+  const { SearchController } = await loadFeature('../viewer/search.js');
   S.search = new SearchController({
     doc,
     viewer: S.viewer,
     onState: onSearchState
   });
 
+  const { AnnotationManager } = await loadFeature('../viewer/annotations.js');
   S.annots = new AnnotationManager({
     viewer: S.viewer,
     onChange: (items) => {
@@ -575,6 +635,7 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
     }
   } catch { /* ignore */ }
 
+  const { ThumbnailPanel } = await loadFeature('../viewer/thumbnails.js');
   S.thumbs = new ThumbnailPanel({
     doc, viewer: S.viewer, container: document.getElementById('panel-thumbs'),
     profile: S.profile, onSelect: (n) => { S.viewer.goToPage(n); closeSidebarMobile(); }
@@ -582,10 +643,19 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   // Thumbnails are built lazily by switchTab() once the sidebar is shown.
 
   S.outline = [];
-  S.bookmarks = new BookmarkStore({ docKey: S.docKey, bookmarks: [], onChange: (items) => { saveBookmarks(S.docKey, items).catch(() => {}); renderBookmarks(); } });
+  S.bookmarks = null;   // created in hydratePanels() once the first page is up
 
   // Small debug/integration surface (also used by the embed bridge).
-  window.LumaPDF = { viewer: S.viewer, doc: S.doc, search: S.search, annots: S.annots, state: S, version: '1.0.0' };
+  window.LumaPDF = { viewer: S.viewer, doc: S.doc, search: S.search, annots: S.annots, state: S, version: APP.version };
+  mark('doc-open');
+
+  // Metadata and document details arrive after the first page, never before it.
+  infoPromise.then((value) => {
+    if (!value || S.doc !== doc) return;
+    S.info = value;
+    renderInfo();
+    S.toolbar.setDocument(name || value.title || 'Untitled document', `${doc.numPages} pages${size ? ' · ' + formatBytes(size) : ''}`);
+  });
 
   renderInfo();
   renderAnnotList();
@@ -607,6 +677,7 @@ async function hydratePanels() {
   } catch { S.outline = []; renderOutline(); }
   try {
     const saved = S.docKey ? await getBookmarks(S.docKey) : [];
+    const { BookmarkStore } = await loadFeature('../viewer/navigation.js');
     S.bookmarks = new BookmarkStore({
       docKey: S.docKey,
       bookmarks: saved || [],
@@ -644,6 +715,7 @@ function onViewerEvent(type, detail) {
     S.forms?.syncZoom();
     S.search?.refresh();
   } else if (type === 'pageRendered') {
+    if (!S._firstPaint) { S._firstPaint = true; mark('first-page'); }
     if (S.forms?.visible) S.forms.renderPage(detail.page);
   } else if (type === 'scroll') {
     els.progress.style.width = `${detail.progress * 100}%`;
@@ -823,7 +895,15 @@ function renderInfo() {
 }
 
 /* ---------------- Actions ---------------- */
+let annotBarBuilt = false;
+function ensureAnnotBar() {
+  if (annotBarBuilt) return;
+  annotBarBuilt = true;
+  buildAnnotBar();
+}
+
 function toggleAnnotations() {
+  ensureAnnotBar();
   const open = els.annotBar.dataset.open === 'true';
   els.annotBar.dataset.open = open ? 'false' : 'true';
   S.toolbar.setAnnotPressed(!open);
@@ -908,6 +988,7 @@ async function savePageImage() {
 
 async function exportAnnotatedPdf() {
   if (!S.doc) return;
+  await loadPdfLib().catch(() => {});
   if (!window.PDFLib) { toast('pdf-lib failed to load, so export is unavailable.', { type: 'error' }); return; }
   const stop = toast('Building a new PDF with your annotations…', { duration: 0 });
   try {
@@ -1117,7 +1198,8 @@ async function promptOpenUrl() {
 }
 
 /* ---------------- Signature + image placement ---------------- */
-function drawSignature() {
+async function drawSignature() {
+  const { openSignatureLibrary } = await loadFeature('../viewer/signatures.js');
   openSignatureLibrary({
     onPick: (sig) => {
       if (!S.annots) return;
