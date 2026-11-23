@@ -8,14 +8,14 @@
 <meta name="theme-color" content="#fcfcfd">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/tokens.css?v=1.0.1">
-<link rel="stylesheet" href="css/reset.css?v=1.0.1">
-<link rel="stylesheet" href="css/themes.css?v=1.0.1">
-<link rel="stylesheet" href="css/main.css?v=1.0.1">
-<link rel="stylesheet" href="css/layout.css?v=1.0.1">
-<link rel="stylesheet" href="css/editor.css?v=1.0.1">
-<link rel="stylesheet" href="css/animations.css?v=1.0.1">
-<link rel="stylesheet" href="css/responsive.css?v=1.0.1">
+<link rel="stylesheet" href="css/tokens.css?v=1.1.0">
+<link rel="stylesheet" href="css/reset.css?v=1.1.0">
+<link rel="stylesheet" href="css/themes.css?v=1.1.0">
+<link rel="stylesheet" href="css/main.css?v=1.1.0">
+<link rel="stylesheet" href="css/layout.css?v=1.1.0">
+<link rel="stylesheet" href="css/editor.css?v=1.1.0">
+<link rel="stylesheet" href="css/animations.css?v=1.1.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.1.0">
 <script>
   try {
     var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
@@ -44,6 +44,11 @@
           <div class="row" style="gap:6px">
             <button class="btn btn-outline btn-sm grow" id="rot-left">Rotate ↺</button>
             <button class="btn btn-outline btn-sm grow" id="rot-right">Rotate ↻</button>
+          </div>
+          <div class="row" style="gap:6px">
+            <button class="btn btn-outline btn-sm grow" id="insert-blank">Insert blank</button>
+            <button class="btn btn-ghost btn-sm grow" id="undo-btn" title="Undo (Ctrl+Z)">Undo</button>
+            <button class="btn btn-ghost btn-sm grow" id="redo-btn" title="Redo (Ctrl+Shift+Z)">Redo</button>
           </div>
           <div class="row" style="gap:6px">
             <button class="btn btn-outline btn-sm grow" id="dup-sel">Duplicate</button>
@@ -100,6 +105,6 @@
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
 <script src="vendor/pdf-lib/pdf-lib.min.js"></script>
-<script type="module" src="js/pages/editor.js?v=1.0.1"></script>
+<script type="module" src="js/pages/editor.js?v=1.1.0"></script>
 </body>
 </html>

@@ -16,7 +16,7 @@
 .runner-head h1 { font-size: var(--fs-xl); }
 .runner-head p { font-size: var(--fs-sm); color: var(--text-muted); margin-top: 2px; }
 .opt-group { display: flex; flex-direction: column; gap: var(--sp-3); }
-.opt-row { display: grid; grid-template-columns: 1fr 132px; gap: var(--sp-3); align-items: center; }
+.opt-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(132px, 190px); gap: var(--sp-3); align-items: center; }
 .opt-row .label { margin: 0; }
 .result-box { border: 1px solid var(--surface-border); border-radius: var(--r-md); padding: var(--sp-4); background: var(--bg-elevated); }
 .result-box .rb-icon { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--success-soft); color: var(--success); margin-bottom: 10px; }

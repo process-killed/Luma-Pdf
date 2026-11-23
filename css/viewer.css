@@ -148,3 +148,41 @@ body.viewer-page { overflow: hidden; }
   box-shadow: var(--page-shadow);
   opacity: .55;
 }
+
+/* Fillable form fields (AcroForm) */
+.form-layer {
+  position: absolute; left: 0; top: 0; z-index: 4;
+  transform-origin: 0 0; pointer-events: none;
+}
+.form-field { position: absolute; display: block; }
+.form-input {
+  width: 100%; height: 100%; box-sizing: border-box;
+  border: calc(1px * var(--inv, 1)) solid color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, #fff);
+  color: #111; border-radius: calc(2px * var(--inv, 1));
+  padding: 0 calc(2px * var(--inv, 1));
+  font: inherit; line-height: 1.15; pointer-events: auto;
+  -webkit-appearance: none; appearance: none;
+}
+.form-input:focus {
+  outline: calc(2px * var(--inv, 1)) solid var(--accent);
+  outline-offset: 0; background: #fff;
+}
+.form-input-checkbox, .form-input-radiogroup, .form-input-radio {
+  width: 100%; height: 100%; accent-color: var(--accent); background: transparent; border: 0;
+}
+.form-input-dropdown, .form-input-optionlist { padding-right: 0; }
+.form-layer .form-input:hover { background: color-mix(in srgb, var(--accent) 16%, #fff); }
+
+/* Floating "fill and save" bar */
+.form-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 17;
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 14px;
+  background: var(--bg-elevated); border: 1px solid var(--surface-border-strong);
+  border-radius: var(--r-pill); box-shadow: var(--shadow-lg); font-size: var(--fs-xs);
+}
+.form-bar[hidden] { display: none; }
+.form-bar .form-bar-text { color: var(--text-secondary); white-space: nowrap; }
+@media (max-width: 860px) {
+  .form-bar { bottom: 64px; font-size: 11px; }
+}

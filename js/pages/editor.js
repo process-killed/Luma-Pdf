@@ -32,6 +32,9 @@ async function main() {
     paintDocumentMeta();
   };
 
+  // Small integration surface (also handy when debugging from the console).
+  window.LumaEditor = { editor: S.editor, pageEditor: S.pageEditor };
+
   wire();
   S.pageEditor.render();
   paintDocumentMeta();
@@ -86,6 +89,14 @@ function wire() {
     S.pageEditor.selection.clear();
     S.pageEditor.render();
   });
+  document.getElementById('undo-btn').addEventListener('click', () => { if (S.editor.undo()) toast('Undone', { duration: 1200 }); });
+  document.getElementById('redo-btn').addEventListener('click', () => { if (S.editor.redo()) toast('Redone', { duration: 1200 }); });
+  document.getElementById('insert-blank').addEventListener('click', () => {
+    const sel = S.pageEditor.selectionInfo();
+    const at = sel.count ? Math.max(...sel.numbers) : S.editor.pages.length;
+    S.editor.insertBlank(1, at);
+    toast('Blank page inserted', { type: 'success', duration: 1600 });
+  });
   document.getElementById('sel-all').addEventListener('click', () => S.pageEditor.selectAll());
   document.getElementById('sel-none').addEventListener('click', () => S.pageEditor.clearSelection());
 
@@ -106,6 +117,11 @@ function wire() {
   document.addEventListener('keydown', (e) => {
     const typing = /input|textarea|select/i.test(e.target.tagName);
     if (typing) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) S.editor.redo(); else S.editor.undo();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); S.pageEditor.selectAll(); }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       const pages = S.pageEditor.selectedPages();
@@ -179,6 +195,10 @@ function paintDocumentMeta() {
   meta.textContent = count
     ? `${count} page${count === 1 ? '' : 's'}${sources > 1 ? ` · ${sources} sources` : ''}${S.editor.overlays.length ? ` · ${S.editor.overlays.length} overlay${S.editor.overlays.length === 1 ? '' : 's'}` : ''}`
     : '';
+  const undoBtn = document.getElementById('undo-btn');
+  const redoBtn = document.getElementById('redo-btn');
+  if (undoBtn) undoBtn.disabled = !S.editor.canUndo;
+  if (redoBtn) redoBtn.disabled = !S.editor.canRedo;
   document.getElementById('export-pdf').disabled = !count;
   document.getElementById('export-selected').disabled = !count;
   document.getElementById('save-library').disabled = !count;

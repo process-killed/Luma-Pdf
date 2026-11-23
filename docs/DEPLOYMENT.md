@@ -11,6 +11,7 @@ upload the folder → open index.html → done
 | Requirement | Why |
 | --- | --- |
 | `.js` served as `text/javascript` | ES modules fail with the wrong MIME type |
+| `.wasm` served as `application/wasm` | qpdf (password tools) loads faster and without a warning |
 | `vendor/pdfjs/pdf.worker.min.js` reachable | PDF.js worker; path is resolved relative to `js/viewer/pdf-engine.js` |
 | `sw.js` at the site root | Service worker scope must cover the pages |
 | HTTPS | Service worker, PWA install, clipboard |

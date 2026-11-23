@@ -8,13 +8,13 @@
 <meta name="theme-color" content="#fcfcfd">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/tokens.css?v=1.0.1">
-<link rel="stylesheet" href="css/reset.css?v=1.0.1">
-<link rel="stylesheet" href="css/themes.css?v=1.0.1">
-<link rel="stylesheet" href="css/main.css?v=1.0.1">
-<link rel="stylesheet" href="css/layout.css?v=1.0.1">
-<link rel="stylesheet" href="css/animations.css?v=1.0.1">
-<link rel="stylesheet" href="css/responsive.css?v=1.0.1">
+<link rel="stylesheet" href="css/tokens.css?v=1.1.0">
+<link rel="stylesheet" href="css/reset.css?v=1.1.0">
+<link rel="stylesheet" href="css/themes.css?v=1.1.0">
+<link rel="stylesheet" href="css/main.css?v=1.1.0">
+<link rel="stylesheet" href="css/layout.css?v=1.1.0">
+<link rel="stylesheet" href="css/animations.css?v=1.1.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.1.0">
 <script>
   try {
     var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
@@ -56,6 +56,7 @@
         <a href="#cors">CORS &amp; remote PDFs</a>
         <a href="#security">Security</a>
         <a href="#performance">Performance</a>
+        <a href="#engines">Engines &amp; offline</a>
         <a href="#testing">Testing</a>
         <a href="#limits">Limitations</a>
       </nav>
@@ -65,7 +66,7 @@
         <p>Luma PDF is a static, browser-only PDF workspace. It has three surfaces:</p>
         <ul>
           <li><strong>Viewer</strong> (<code>viewer.html</code>) — reading, search, annotations, export.</li>
-          <li><strong>Tools</strong> (<code>tools.html</code>) — 33 utilities built on pdf-lib and PDF.js.</li>
+          <li><strong>Tools</strong> (<code>tools.html</code>) — 39 utilities built on pdf-lib, PDF.js, qpdf and Tesseract.</li>
           <li><strong>Embed</strong> (<code>embed.html</code>) — a chrome-light viewer configured entirely by URL parameters.</li>
         </ul>
         <p>There is no server component. Rendering uses PDF.js (Apache-2.0), editing uses pdf-lib (MIT), and both are vendored in <code>vendor/</code> so the app works offline and needs no CDN.</p>
@@ -215,6 +216,7 @@ iframe.contentWindow.postMessage({ type: 'luma:setPage', page: 4 }, 'https://you
         <h3>What the host must get right</h3>
         <ul>
           <li><code>.js</code> must be served as <code>text/javascript</code> (modules fail otherwise).</li>
+          <li><code>.wasm</code> must be served as <code>application/wasm</code> (qpdf and any future WASM).</li>
           <li>The PDF.js worker must be reachable at <code>vendor/pdfjs/pdf.worker.min.js</code>.</li>
           <li><code>sw.js</code> must be served from the site root (or the sub-folder root) so its scope covers the app.</li>
           <li>HTTPS is required for the service worker, installation and clipboard access.</li>
@@ -240,12 +242,13 @@ iframe.contentWindow.postMessage({ type: 'luma:setPage', page: 4 }, 'https://you
 }</pre></div>
         <h3>Apache</h3>
         <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>AddType text/javascript .js
+AddType application/wasm .wasm
 AddType application/pdf .pdf
 &lt;IfModule mod_headers.c&gt;
   Header set X-Content-Type-Options "nosniff"
 &lt;/IfModule&gt;</pre></div>
         <h3>Nginx</h3>
-        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>types { text/javascript js mjs; application/pdf pdf; }
+        <div class="codeblock"><button class="copy-code" data-copy>Copy</button><pre>types { text/javascript js mjs; application/wasm wasm; application/pdf pdf; }
 location / { try_files $uri $uri/ /index.html; }
 location = /sw.js { add_header Cache-Control "no-cache"; }</pre></div>
         <p>The app uses plain file names (<code>viewer.html</code>, <code>embed.html</code>), so no SPA rewrite rules are required. If you enable clean URLs, keep the <code>.html</code> fallback working.</p>
@@ -314,9 +317,30 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
           <li>Highlight text, draw with the pen, add a note, then export the annotated copy and reopen it.</li>
           <li>Run Merge, Split, Rotate, Watermark and Compress on the same file and open every output.</li>
           <li>In the embed: toggle the sidebar, change theme, and drive it with <code>setPage</code> from the parent.</li>
+          <li>Fill a form, save a flattened copy, and confirm the values show in another reader.</li>
+          <li>Protect a PDF with a password, reopen it (password prompt), then unlock it.</li>
+          <li>Run OCR on a scanned page and search for a word that only exists as pixels.</li>
           <li>Install the PWA, go offline, and reopen a saved document from the Library.</li>
           <li>Resize from 320 px to 1920 px: no horizontal scrolling, no clipped toolbars.</li>
         </ul>
+
+        <h2 id="engines">Engines &amp; offline behaviour</h2>
+        <p>Four engines do the heavy lifting, and all of them run inside the tab:</p>
+        <table>
+          <thead><tr><th>Engine</th><th>Used for</th><th>Where it lives</th></tr></thead>
+          <tbody>
+            <tr><td>PDF.js 3.11</td><td>Rendering, text layer, search, outline, metadata</td><td><code>vendor/pdfjs/</code> — vendored</td></tr>
+            <tr><td>pdf-lib 1.17</td><td>Page operations, annotations export, AcroForm filling, imposition</td><td><code>vendor/pdf-lib/</code> — vendored</td></tr>
+            <tr><td>qpdf (WASM)</td><td>AES-256 password protection and unlocking</td><td><code>vendor/qpdf/</code> — vendored, 1.4 MB</td></tr>
+            <tr><td>Tesseract.js 5.1</td><td>OCR (searchable text layer)</td><td>Downloaded on first OCR use (~7 MB)</td></tr>
+          </tbody>
+        </table>
+        <p>Only OCR needs the network, and only for the engine: the document is never uploaded. <a href="docs/OCR.md">docs/OCR.md</a> explains how to vendor the engine and language files for fully offline OCR, and how to add languages.</p>
+        <div class="note warn"><strong>Serve <code>.wasm</code> as <code>application/wasm</code>.</strong> qpdf needs it, and a wrong MIME type forces a slower fallback in the browser. The included <code>deployment/</code> files set it for Netlify, Vercel, Cloudflare, Apache and Nginx.</div>
+        <h3>Filling forms</h3>
+        <p>The viewer reads the AcroForm definition with pdf-lib, draws inputs in page coordinates and writes the values back on save. Fields stay aligned at any zoom because the overlay is scaled with a single CSS transform. Flattening is on by default: it turns the values into page content, so readers that ignore form appearances still show them.</p>
+        <h3>Signatures</h3>
+        <p>Drawn, typed or uploaded signatures are trimmed to their ink and given a transparent background. Up to eight are kept in <code>localStorage</code> on this device. They are placed as annotation images and written into the PDF on export — a visible signature, not a cryptographic one.</p>
 
         <h2 id="limits">Limitations</h2>
         <ul>
@@ -326,6 +350,8 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
           <li><strong>Compression</strong> re-renders pages as images, so text stops being selectable.</li>
           <li><strong>Huge files</strong> (hundreds of megabytes) are limited by browser memory, not by the app.</li>
           <li><strong>Digital signatures</strong> are drawn images, not cryptographic signatures.</li>
+          <li><strong>OCR</strong> bundles English; other languages need a <code>.traineddata</code> file, and handwriting is recognised poorly.</li>
+          <li><strong>Password recovery</strong> is impossible: encryption is real, so a lost password means a lost document.</li>
         </ul>
         <p class="muted small" style="margin-top:28px">Luma PDF v1.0.0 · PDF.js and pdf-lib are used under their respective licences.</p>
       </article>
@@ -336,6 +362,6 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
 <footer data-shell="footer"></footer>
 <div class="toast-host" aria-live="polite"></div>
 
-<script type="module" src="js/pages/docs.js?v=1.0.1"></script>
+<script type="module" src="js/pages/docs.js?v=1.1.0"></script>
 </body>
 </html>

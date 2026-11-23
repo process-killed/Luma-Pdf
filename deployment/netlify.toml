@@ -12,6 +12,11 @@
     X-Frame-Options = "SAMEORIGIN"
 
 [[headers]]
+  for = "*.wasm"
+  [headers.values]
+    Content-Type = "application/wasm"
+
+[[headers]]
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"

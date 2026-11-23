@@ -4,6 +4,9 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=()
 
+/*.wasm
+  Content-Type: application/wasm
+
 /sw.js
   Cache-Control: no-cache
 

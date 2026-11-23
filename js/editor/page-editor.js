@@ -146,6 +146,25 @@ export class PageEditor {
 
   async renderThumb({ page, host }) {
     if (!host.isConnected) return;
+    if (page.blank) {
+      const size = page.size || { width: 595.28, height: 841.89 };
+      const canvas = document.createElement('canvas');
+      canvas.width = 150;
+      canvas.height = Math.round(150 * (size.height / size.width));
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#d9d9e2';
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+      this.thumbs.set(page.id, canvas);
+      const copy = document.createElement('canvas');
+      copy.width = canvas.width;
+      copy.height = canvas.height;
+      copy.getContext('2d').drawImage(canvas, 0, 0);
+      host.replaceChildren(copy);
+      return;
+    }
     const doc = await this.editor.pageDoc(page);
     const proxy = await doc.getPage(page.index + 1);
     const base = proxy.getViewport({ scale: 1, rotation: page.rotation });

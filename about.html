@@ -8,13 +8,13 @@
 <meta name="theme-color" content="#fcfcfd">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/tokens.css?v=1.0.1">
-<link rel="stylesheet" href="css/reset.css?v=1.0.1">
-<link rel="stylesheet" href="css/themes.css?v=1.0.1">
-<link rel="stylesheet" href="css/main.css?v=1.0.1">
-<link rel="stylesheet" href="css/layout.css?v=1.0.1">
-<link rel="stylesheet" href="css/homepage.css?v=1.0.1">
-<link rel="stylesheet" href="css/responsive.css?v=1.0.1">
+<link rel="stylesheet" href="css/tokens.css?v=1.1.0">
+<link rel="stylesheet" href="css/reset.css?v=1.1.0">
+<link rel="stylesheet" href="css/themes.css?v=1.1.0">
+<link rel="stylesheet" href="css/main.css?v=1.1.0">
+<link rel="stylesheet" href="css/layout.css?v=1.1.0">
+<link rel="stylesheet" href="css/homepage.css?v=1.1.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.1.0">
 <script>
   try {
     var s = JSON.parse(localStorage.getItem('luma.settings.v1') || '{}');
@@ -40,7 +40,7 @@
   <div class="container section-tight">
     <div class="prose" style="max-width:78ch">
       <h2>What it is</h2>
-      <p>A complete, static PDF application: reader, annotator, page organiser, 33 conversion and cleanup tools, and an embeddable viewer for websites. Everything runs in the browser tab you have open. Nothing is transmitted, and nothing needs an account.</p>
+      <p>A complete, static PDF application: reader, annotator, page organiser, 39 conversion, cleanup and security tools, and an embeddable viewer for websites. Everything runs in the browser tab you have open. Nothing is transmitted, and nothing needs an account.</p>
 
       <h2>Privacy, concretely</h2>
       <ul>
@@ -57,10 +57,12 @@
         <thead><tr><th>Library</th><th>Version</th><th>Licence</th><th>Used for</th></tr></thead>
         <tbody>
           <tr><td>PDF.js</td><td>3.11.174</td><td>Apache-2.0</td><td>Rendering, text layer, search, outline, metadata</td></tr>
-          <tr><td>pdf-lib</td><td>1.17.1</td><td>MIT</td><td>Page copying, rotation, watermarks, annotations export</td></tr>
+          <tr><td>pdf-lib</td><td>1.17.1</td><td>MIT</td><td>Page copying, rotation, watermarks, annotations export, form filling</td></tr>
+          <tr><td>qpdf (WebAssembly)</td><td>11.x</td><td>Apache-2.0</td><td>AES-256 password protection and unlocking</td></tr>
+          <tr><td>Tesseract.js</td><td>5.1.1</td><td>Apache-2.0</td><td>OCR — fetched on first use, never the document</td></tr>
         </tbody>
       </table>
-      <p>Both are vendored in <code>vendor/</code> so the app works offline and never calls a CDN. The interface, design system and all application code are original.</p>
+      <p>PDF.js, pdf-lib and qpdf are vendored in <code>vendor/</code> so the app works offline. The only runtime download is the OCR engine, which is fetched the first time you run OCR — the document itself never leaves the device. The interface, design system and all application code are original.</p>
 
       <h2>What it deliberately does not do</h2>
       <ul>
@@ -74,7 +76,7 @@
       <p>Rendering is virtualised, canvases are capped by a pixel budget, and memory is released as you scroll. On a 3 GB Android phone the Eco profile keeps a document readable instead of crashing the tab — the same profile that renders this page.</p>
 
       <h2>Version</h2>
-      <p class="mono small" data-build-stamp>v1.0.0</p>
+      <p class="mono small" data-build-stamp>v1.1.0</p>
       <p><a href="docs.html">Developer documentation</a> · <a href="settings.html">Settings</a> · <a href="library.html">Local library</a></p>
     </div>
   </div>
@@ -82,6 +84,6 @@
 
 <footer data-shell="footer"></footer>
 <div class="toast-host" aria-live="polite"></div>
-<script type="module" src="js/pages/about.js?v=1.0.1"></script>
+<script type="module" src="js/pages/about.js?v=1.1.0"></script>
 </body>
 </html>

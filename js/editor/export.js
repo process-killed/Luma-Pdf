@@ -39,6 +39,13 @@ export async function buildPdf(editor, { onProgress } = {}) {
   const written = [];
   for (let i = 0; i < total; i++) {
     const pageRef = editor.pages[i];
+    if (pageRef.blank) {
+      const size = pageRef.size || { width: 595.28, height: 841.89 };
+      const blank = out.addPage([size.width, size.height]);
+      written.push(blank);
+      onProgress?.((i + 1) / total * 0.8, `Adding blank page ${i + 1} of ${total}`);
+      continue;
+    }
     const srcDoc = await libFor(pageRef.srcId);
     const [copied] = await out.copyPages(srcDoc, [pageRef.index]);
     const baseRotation = copied.getRotation().angle || 0;

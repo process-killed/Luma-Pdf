@@ -22,7 +22,7 @@ export class Toolbar {
     this.opts = {
       sidebar: true, search: true, download: true, print: true, fullscreen: true,
       annotations: true, navigation: true, title: true, minimal: false, moreMenu: true,
-      pan: false,
+      pan: false, forms: false,
       ...opts
     };
     this.refs = {};
@@ -34,6 +34,7 @@ export class Toolbar {
     this.host.innerHTML = `
       ${o.sidebar ? `<button class="tb-btn" data-act="sidebar" aria-label="Toggle sidebar" title="Sidebar (Ctrl+B)" aria-pressed="true">${icon('sidebar')}</button>` : ''}
       ${o.pan ? `<button class="tb-btn" data-act="pan" aria-label="Hand tool — drag to move the page" title="Hand tool (H) · or hold Space" aria-pressed="false">${icon('move')}</button>` : ''}
+      ${o.forms ? `<button class="tb-btn" data-act="forms" aria-label="Fill form fields" title="Fill form fields" aria-pressed="false" hidden>${icon('edit')}</button>` : ''}
       ${o.title ? `<div class="tb-title">
         <span class="doc-name" data-ref="docName">No document</span>
         <span class="doc-meta" data-ref="docMeta"></span>
@@ -128,6 +129,7 @@ export class Toolbar {
 
     click('sidebar', () => o.onSidebar?.());
     click('pan', () => o.onPan?.());
+    click('forms', () => o.onForms?.());
     click('prev', () => o.onPrev?.());
     click('next', () => o.onNext?.());
     click('zoom-in', () => o.onZoomIn?.());
@@ -250,6 +252,18 @@ export class Toolbar {
 
   setSearchCount(text) {
     if (this.refs.searchCount) this.refs.searchCount.textContent = text;
+  }
+
+  /** Reveal the form button once fields are known to exist. */
+  showForms(count) {
+    const btn = this.host.querySelector('[data-act="forms"]');
+    if (!btn) return;
+    btn.hidden = !count;
+    btn.title = count ? `Fill form fields (${count})` : 'Fill form fields';
+  }
+
+  setFormsPressed(on) {
+    this.host.querySelector('[data-act="forms"]')?.setAttribute('aria-pressed', String(on));
   }
 
   setPanPressed(on) {

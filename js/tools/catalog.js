@@ -5,21 +5,27 @@ import { pdfToJpg, pdfToPng, pdfToWebp, pdfToPrintImages, imagesToPdf, pdfToText
 import { compress, optimizeImages, reduceSize, stripMetadata, losslessOptimize } from './compress.js';
 import { metadata, pageCount, fileInfo, dimensions, version, passwordCheck, outline, textExtract } from './metadata.js';
 import { watermark, pageNumbers, signature } from './watermark.js';
+import { protectPdf, formFields } from './security.js';
+import { ocrPdf } from './ocr.js';
+import { pdfToMarkdown } from './markdown.js';
+import { autoCrop, nUp } from './impose.js';
 
 export const CATEGORIES = [
   { id: 'organize', label: 'Organise pages', desc: 'Merge, split, reorder and reshape documents.' },
   { id: 'convert', label: 'Convert', desc: 'Move between PDF, images and plain text.' },
   { id: 'optimize', label: 'Optimise', desc: 'Shrink files and clean up metadata.' },
   { id: 'inspect', label: 'Inspect', desc: 'Read what is inside a document.' },
-  { id: 'markup', label: 'Mark up', desc: 'Add watermarks, page numbers and signatures.' }
+  { id: 'markup', label: 'Mark up', desc: 'Add watermarks, page numbers and signatures.' },
+  { id: 'secure', label: 'Secure', desc: 'Passwords, permissions and form fields.' }
 ];
 
 export const TOOLS = [
-  merge, split, extract, deletePages, reorder, rotate, crop, resize, duplicatePages,
-  pdfToJpg, pdfToPng, pdfToWebp, pdfToPrintImages, imagesToPdf, pdfToText, textToPdf,
+  merge, split, extract, deletePages, reorder, rotate, crop, autoCrop, resize, duplicatePages, nUp,
+  pdfToJpg, pdfToPng, pdfToWebp, pdfToPrintImages, imagesToPdf, pdfToText, textToPdf, ocrPdf, pdfToMarkdown,
   compress, optimizeImages, reduceSize, losslessOptimize, stripMetadata,
   metadata, pageCount, fileInfo, dimensions, version, passwordCheck, outline, textExtract, screenshot,
-  watermark, pageNumbers, signature
+  watermark, pageNumbers, signature,
+  protectPdf, formFields
 ];
 
 export function getTool(id) {

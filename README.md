@@ -2,7 +2,7 @@
 
 A universal PDF workspace that runs entirely in the browser: read, search, annotate, edit, convert, and embed PDFs without uploading anything.
 
-**v1.0.1** · static files · no build step · no backend · no account
+**v1.1.0** · static files · no build step · no backend · no account
 
 ---
 
@@ -10,9 +10,9 @@ A universal PDF workspace that runs entirely in the browser: read, search, annot
 
 | Surface | File | What you get |
 | --- | --- | --- |
-| Viewer | `viewer.html` | Continuous / single / horizontal / spread / book layouts, RTL, presentation and distraction-free modes, 25–500% zoom with pinch and cursor-anchored wheel zoom, drag-to-pan, whole-document search over the real text layer, thumbnails, outline, bookmarks, annotations that snap to text (highlight, ink, shapes, notes, signatures) and export into a new PDF |
-| Tools | `tools.html` | 33 utilities: merge, split, extract, delete, reorder, rotate, crop, resize, duplicate, PDF↔JPG/PNG/WebP, images→PDF, PDF↔text, print images, compress, optimise, reduce, strip metadata, metadata, page count, file info, dimensions, version, password check, outline, text extraction, screenshot, watermark, page numbers, signature |
-| Editor | `editor.html` | Page organiser (multi-select, drag reorder, rotate, duplicate, delete, extract) plus export-time text, image, watermark and page-number overlays |
+| Viewer | `viewer.html` | Continuous / single / horizontal / spread / book layouts, RTL, presentation and distraction-free modes, 25–500% zoom with pinch and cursor-anchored wheel zoom, drag-to-pan, whole-document search over the real text layer, thumbnails, outline, bookmarks, annotations that snap to text, **fillable form fields**, a **signature library** (draw / type / upload) and export into a new PDF |
+| Tools | `tools.html` | 39 utilities: merge, split, extract, delete, reorder, rotate, crop, **auto-crop**, resize, duplicate, **N-up / booklet**, PDF↔JPG/PNG/WebP, images→PDF, PDF↔text, **PDF→Markdown**, **OCR**, print images, compress, optimise, reduce, strip metadata, metadata, page count, file info, dimensions, version, password check, **protect/unlock (AES-256)**, outline, text extraction, screenshot, watermark, page numbers, signature, **form fields**: merge, split, extract, delete, reorder, rotate, crop, resize, duplicate, PDF↔JPG/PNG/WebP, images→PDF, PDF↔text, print images, compress, optimise, reduce, strip metadata, metadata, page count, file info, dimensions, version, password check, outline, text extraction, screenshot, watermark, page numbers, signature |
+| Editor | `editor.html` | Page organiser (multi-select, drag reorder, rotate, duplicate, delete, extract, **insert blank pages**, **undo/redo**) plus export-time text, image, watermark and page-number overlays |
 | Embed | `embed.html` | Chrome-light viewer configured by 26 URL parameters, with a `postMessage` API and strict origin checks |
 | Generator | `embed-generator.html` | Live preview, presets, generated URL and iframe snippets |
 | Library | `library.html` | Local-only document library with reading positions, favourites and storage controls |
@@ -42,7 +42,9 @@ Deploy by copying the folder to Cloudflare Pages, Netlify, Vercel, GitHub Pages,
 
 * **HTML5 / CSS3 / vanilla ES modules** — no framework, no runtime.
 * **[PDF.js](https://mozilla.github.io/pdf.js/) 3.11.174** (Apache-2.0) — rendering, text layer, search, outline, metadata.
-* **[pdf-lib](https://pdf-lib.js.org/) 1.17.1** (MIT) — page copying, rotation, watermarks, annotation export.
+* **[pdf-lib](https://pdf-lib.js.org/) 1.17.1** (MIT) — page copying, rotation, watermarks, annotation export, AcroForm filling.
+* **[qpdf](https://qpdf.readthedocs.io/) (WASM)** (Apache-2.0) — AES-256 password protection and unlocking, vendored in `vendor/qpdf/`.
+* **[Tesseract.js](https://tesseract.projectnaptha.com/) 5.1.1** (Apache-2.0) — OCR; the engine is fetched on first use (see `docs/OCR.md`).
 * **IndexedDB** — local documents, annotations, bookmarks, reading positions.
 * **Service worker + manifest** — installable PWA with an offline shell.
 
@@ -54,7 +56,7 @@ Both libraries are vendored in `vendor/`, pinned, and loaded from the same origi
 luma-pdf/
 ├── index.html                 homepage
 ├── viewer.html                reader + annotations
-├── tools.html                 33 PDF tools
+├── tools.html                 39 PDF tools
 ├── editor.html                page organiser + overlays
 ├── embed.html                 embeddable viewer
 ├── embed-generator.html       embed builder
@@ -72,19 +74,21 @@ luma-pdf/
 │   ├── app.js  shell.js  config.js  state.js  theme.js
 │   ├── pages/                 one module per page
 │   ├── viewer/                pdf-engine, renderer, viewer, search,
-│   │                          thumbnails, annotations, toolbar, keyboard, navigation
+│   │                          thumbnails, annotations, toolbar, keyboard,
+│   │                          navigation, forms, signatures
 │   ├── editor/                document-editor, page-editor, export,
 │   │                          text-editor, image-editor
 │   ├── tools/                 catalog, pdf-utils, merge, split, convert,
-│   │                          compress, metadata, watermark
+│   │                          compress, metadata, watermark, security,
+│   │                          ocr, markdown, impose
 │   ├── embed/                 config, messaging, api
 │   ├── storage/               database, library, history, cache
 │   ├── pwa/                   install, updates
 │   ├── performance/           device-detection, adaptive-rendering, memory-manager
 │   ├── ui/                    icons, ui primitives
 │   └── utils/                 dom, files, urls, security, browser, accessibility, zip
-├── vendor/                    pdfjs/, pdf-lib/ (pinned)
-├── docs/                      README, EMBEDDING, API, DEPLOYMENT, SECURITY, CORS, PERFORMANCE, TESTING
+├── vendor/                    pdfjs/, pdf-lib/, qpdf/ (pinned)
+├── docs/                      README, EMBEDDING, API, DEPLOYMENT, SECURITY, CORS, PERFORMANCE, TESTING, OCR
 └── deployment/                netlify.toml, vercel.json, _headers, apache.conf, nginx.conf
 ```
 

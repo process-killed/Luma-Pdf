@@ -14,6 +14,38 @@ export class DocumentEditor {
     this.name = 'document.pdf';
     this.onChange = () => {};
     this.onProgress = () => {};
+    this.past = [];
+    this.future = [];
+  }
+
+  /* ---------- undo history ---------- */
+  snapshot() {
+    this.past.push(JSON.stringify({ pages: this.pages, overlays: this.overlays }));
+    if (this.past.length > 50) this.past.shift();
+    this.future = [];
+  }
+
+  get canUndo() { return this.past.length > 0; }
+  get canRedo() { return this.future.length > 0; }
+
+  undo() {
+    if (!this.past.length) return false;
+    this.future.push(JSON.stringify({ pages: this.pages, overlays: this.overlays }));
+    const state = JSON.parse(this.past.pop());
+    this.pages = state.pages;
+    this.overlays = state.overlays;
+    this.onChange();
+    return true;
+  }
+
+  redo() {
+    if (!this.future.length) return false;
+    this.past.push(JSON.stringify({ pages: this.pages, overlays: this.overlays }));
+    const state = JSON.parse(this.future.pop());
+    this.pages = state.pages;
+    this.overlays = state.overlays;
+    this.onChange();
+    return true;
   }
 
   get pageCount() { return this.pages.length; }
@@ -47,11 +79,13 @@ export class DocumentEditor {
   }
 
   rotate(pages, delta = 90) {
+    this.snapshot();
     pages.forEach((p) => { p.rotation = (p.rotation + delta + 360) % 360; });
     this.onChange();
   }
 
   delete(pages) {
+    this.snapshot();
     const ids = new Set(pages.map((p) => p.id));
     this.pages = this.pages.filter((p) => !ids.has(p.id));
     this.overlays.forEach((o) => {
@@ -61,6 +95,7 @@ export class DocumentEditor {
   }
 
   duplicate(pages) {
+    this.snapshot();
     const ids = new Set(pages.map((p) => p.id));
     const out = [];
     this.pages.forEach((p) => {
@@ -73,25 +108,43 @@ export class DocumentEditor {
 
   move(fromIndex, toIndex) {
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    this.snapshot();
     const [item] = this.pages.splice(fromIndex, 1);
     this.pages.splice(toIndex, 0, item);
     this.onChange();
   }
 
   extract(pages) {
+    this.snapshot();
     const ids = new Set(pages.map((p) => p.id));
     this.pages = this.pages.filter((p) => ids.has(p.id));
     this.onChange();
   }
 
   addOverlay(overlay) {
+    this.snapshot();
     this.overlays.push({ id: uid('ov'), ...overlay });
     this.onChange();
   }
 
   removeOverlay(id) {
+    this.snapshot();
     this.overlays = this.overlays.filter((o) => o.id !== id);
     this.onChange();
+  }
+
+  /** Insert blank pages after a given index (0 = at the very start). */
+  insertBlank(count = 1, atIndex = this.pages.length, size = null) {
+    const base = size || (this.pages[atIndex - 1]?.blank ? this.pages[atIndex - 1].size : null)
+      || { width: 595.28, height: 841.89 };
+    this.snapshot();
+    const added = [];
+    for (let i = 0; i < count; i++) {
+      added.push({ id: uid('pg'), srcId: null, index: -1, rotation: 0, blank: true, size: { ...base } });
+    }
+    this.pages.splice(atIndex, 0, ...added);
+    this.onChange();
+    return added;
   }
 
   reset() {

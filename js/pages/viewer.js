@@ -16,6 +16,8 @@ import { AnnotationManager } from '../viewer/annotations.js';
 import { Toolbar } from '../viewer/toolbar.js';
 import { KeyController } from '../viewer/keyboard.js';
 import { BookmarkStore } from '../viewer/navigation.js';
+import { FormLayer } from '../viewer/forms.js';
+import { openSignatureLibrary } from '../viewer/signatures.js';
 import { getDocument, saveDocument, getAnnotations, saveAnnotations, getBookmarks, saveBookmarks, getReadingState, saveReadingState, touchDocument } from '../storage/library.js';
 import { currentProfile } from '../app.js';
 
@@ -68,6 +70,8 @@ function buildToolbar() {
   S.toolbar = new Toolbar(els.toolbar, {
     pan: true,
     onPan: togglePan,
+    forms: true,
+    onForms: toggleForms,
     onSidebar: toggleSidebar,
     onPrev: () => S.viewer?.prevPage(),
     onNext: () => S.viewer?.nextPage(),
@@ -121,6 +125,94 @@ function togglePan() {
   toast(on
     ? 'Hand tool on — drag to move the page (or hold Space to pan temporarily)'
     : 'Hand tool off', { duration: 2400 });
+}
+
+async function loadForms() {
+  if (!S.doc || !window.PDFLib) return;
+  try {
+    const bytes = await sourceBytes();
+    S.forms = new FormLayer({
+      viewer: S.viewer,
+      onChange: (form) => paintFormBar(form)
+    });
+    const count = await S.forms.load(bytes);
+    if (!count) return;
+    S.toolbar.showForms(count);
+    paintFormBar(S.forms);
+    toast(`This PDF has ${count} fillable field${count === 1 ? '' : 's'}. Click the pen-and-form button to fill them.`, {
+      type: 'info', duration: 5200,
+      action: { label: 'Fill now', onClick: () => toggleForms() }
+    });
+  } catch { /* no form layer available (CORS, encryption, or no fields) */ }
+}
+
+function toggleForms() {
+  if (!S.forms?.hasFields) {
+    toast('This PDF has no fillable form fields.', { type: 'info', duration: 2400 });
+    return;
+  }
+  const on = !S.forms.visible;
+  S.forms.setVisible(on);
+  S.toolbar.setFormsPressed(on);
+  paintFormBar(S.forms);
+  if (on) {
+    const { fields } = S.forms.summary();
+    toast(`${fields} field${fields === 1 ? '' : 's'} — fill them in, then save a copy.`, { duration: 3000 });
+  }
+}
+
+function paintFormBar(form) {
+  let bar = document.getElementById('form-bar');
+  const active = form && form.hasFields && form.visible;
+  if (!active) { bar?.remove(); return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'form-bar';
+    bar.id = 'form-bar';
+    bar.innerHTML = `<span class="form-bar-text"></span>
+      <button class="btn btn-ghost btn-sm" data-form="clear">Clear</button>
+      <button class="btn btn-primary btn-sm" data-form="save">${icon('save', 'icon-sm')}Save filled PDF</button>`;
+    els.workspace.append(bar);
+    bar.querySelector('[data-form="save"]').addEventListener('click', saveFilledForm);
+    bar.querySelector('[data-form="clear"]').addEventListener('click', () => {
+      S.forms.values.clear();
+      S.forms.fields.forEach((f) => S.forms.values.set(f.id, f.type === 'PDFCheckBox' ? false : ''));
+      S.forms.fields.forEach((f) => S.forms.renderPage(f.page));
+      paintFormBar(S.forms);
+    });
+  }
+  const { filled, fields } = form.summary();
+  bar.querySelector('.form-bar-text').textContent = `${filled} of ${fields} filled`;
+}
+
+async function saveFilledForm() {
+  if (!S.forms?.hasFields) return;
+  const body = document.createElement('div');
+  body.innerHTML = `<p class="small muted" style="line-height:1.6">The values are written into a new copy of the PDF. Your original file is untouched.</p>
+    <label class="checkbox" style="margin-top:12px"><input type="checkbox" id="form-flatten" checked> Flatten the form (recommended — every reader then shows the values)</label>
+    <p class="hint" style="margin-top:8px">Flattening removes the ability to edit the fields later. Uncheck it if the recipient must still fill something in.</p>`;
+  const ok = await dialog({
+    title: 'Save the filled PDF',
+    sub: `${S.forms.filledCount} of ${S.forms.count} fields filled`,
+    body,
+    actions: [
+      { label: 'Cancel', value: false, variant: 'ghost' },
+      { label: 'Save a copy', value: true, variant: 'primary' }
+    ]
+  });
+  if (!ok) return;
+  const flatten = body.querySelector('#form-flatten').checked;
+  const stop = toast('Writing the form values…', { duration: 0 });
+  try {
+    const { bytes, applied } = await S.forms.save({ flatten });
+    const name = pdfName(S.docName || 'document', '-filled');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), name);
+    stop.close();
+    toast(`${applied} field${applied === 1 ? '' : 's'} saved into ${name}`, { type: 'success', duration: 5000 });
+  } catch (e) {
+    stop.close();
+    toast('Could not save the form: ' + e.message, { type: 'error', duration: 7000 });
+  }
 }
 
 function syncZoom() {
@@ -497,6 +589,7 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
 
   renderInfo();
   renderAnnotList();
+  loadForms();
   bindKeys();
   attachPersistence();
   document.title = `${name} — Luma PDF`;
@@ -537,16 +630,21 @@ function onViewerEvent(type, detail) {
     els.pill._t = setTimeout(() => { els.pill.dataset.visible = 'false'; }, 1200);
     S.thumbs?.setCurrent(detail.page);
     S.annots?.renderPage(detail.page);
+    S.forms?.renderPage(detail.page);
     els.progress.style.width = `${(detail.page / detail.total) * 100}%`;
     scheduleSave();
   } else if (type === 'zoomChanged') {
     S.toolbar.setZoom(detail.percent);
     S.annots?.syncZoom();
+    S.forms?.syncZoom();
     scheduleSave();
   } else if (type === 'zoomSettled') {
     S.toolbar.setZoom(detail.percent);
     S.annots?.syncZoom();
+    S.forms?.syncZoom();
     S.search?.refresh();
+  } else if (type === 'pageRendered') {
+    if (S.forms?.visible) S.forms.renderPage(detail.page);
   } else if (type === 'scroll') {
     els.progress.style.width = `${detail.progress * 100}%`;
   } else if (type === 'modeChanged') {
@@ -1020,52 +1118,12 @@ async function promptOpenUrl() {
 
 /* ---------------- Signature + image placement ---------------- */
 function drawSignature() {
-  const wrap = document.createElement('div');
-  wrap.innerHTML = `<p class="hint" style="margin-bottom:8px">Draw with a mouse, stylus or finger. The signature is placed where you click next.</p>
-    <div class="sig-pad"><canvas id="sig-canvas" width="600" height="220"></canvas><div class="sig-baseline"></div></div>
-    <div class="row" style="margin-top:8px;gap:8px"><button class="btn btn-ghost btn-sm" id="sig-clear">Clear</button>
-    <span class="hint">Transparent background</span></div>`;
-  dialog({
-    title: 'Draw a signature',
-    body: wrap,
-    actions: [
-      { label: 'Cancel', value: null, variant: 'ghost' },
-      { label: 'Use signature', value: 'ok', variant: 'primary' }
-    ],
-    onMount: (dlg) => {
-      const canvas = dlg.querySelector('#sig-canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = '#111';
-      let drawing = false, last = null;
-      const pos = (e) => {
-        const r = canvas.getBoundingClientRect();
-        return { x: ((e.clientX - r.left) / r.width) * canvas.width, y: ((e.clientY - r.top) / r.height) * canvas.height };
-      };
-      canvas.addEventListener('pointerdown', (e) => { drawing = true; last = pos(e); canvas.setPointerCapture(e.pointerId); });
-      canvas.addEventListener('pointermove', (e) => {
-        if (!drawing) return;
-        const p = pos(e);
-        ctx.beginPath();
-        ctx.moveTo(last.x, last.y);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-        last = p;
-      });
-      ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => canvas.addEventListener(t, () => { drawing = false; }));
-      dlg.querySelector('#sig-clear').addEventListener('click', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
-      dlg.addEventListener('close', () => {
-        if (dlg.returnValue === 'ok') {
-          const dataUrl = canvas.toDataURL('image/png');
-          if (S.annots) {
-            S.annots.pendingImage = { src: dataUrl, width: 600, height: 220 };
-            setTool('signature');
-            toast('Now click on the page to place your signature', { duration: 3200 });
-          }
-        }
-      }, { once: true });
+  openSignatureLibrary({
+    onPick: (sig) => {
+      if (!S.annots) return;
+      S.annots.pendingImage = { src: sig.dataUrl, width: sig.width, height: sig.height };
+      useTool('signature');
+      toast('Now click on the page to place your signature', { duration: 3200 });
     }
   });
 }

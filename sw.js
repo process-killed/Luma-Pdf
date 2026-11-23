@@ -1,6 +1,6 @@
 /* Luma PDF service worker — offline application shell.
    Documents you save are stored by the page in IndexedDB, not here. */
-const VERSION = 'luma-pdf-v1.0.1';
+const VERSION = 'luma-pdf-v1.1.0';
 const SHELL_CACHE = VERSION + '-shell';
 const RUNTIME_CACHE = VERSION + '-runtime';
 
@@ -68,9 +68,13 @@ const SHELL = [
   './js/tools/catalog.js',
   './js/tools/compress.js',
   './js/tools/convert.js',
+  './js/tools/impose.js',
+  './js/tools/markdown.js',
   './js/tools/merge.js',
   './js/tools/metadata.js',
+  './js/tools/ocr.js',
   './js/tools/pdf-utils.js',
+  './js/tools/security.js',
   './js/tools/split.js',
   './js/tools/watermark.js',
   './js/ui/icons.js',
@@ -83,11 +87,13 @@ const SHELL = [
   './js/utils/urls.js',
   './js/utils/zip.js',
   './js/viewer/annotations.js',
+  './js/viewer/forms.js',
   './js/viewer/keyboard.js',
   './js/viewer/navigation.js',
   './js/viewer/pdf-engine.js',
   './js/viewer/renderer.js',
   './js/viewer/search.js',
+  './js/viewer/signatures.js',
   './js/viewer/thumbnails.js',
   './js/viewer/toolbar.js',
   './js/viewer/viewer.js',
@@ -99,6 +105,8 @@ const SHELL = [
   './vendor/pdf-lib/pdf-lib.min.js',
   './vendor/pdfjs/pdf.min.js',
   './vendor/pdfjs/pdf.worker.min.js',
+  './vendor/qpdf/qpdf.js',
+  './vendor/qpdf/qpdf.wasm',
   './viewer.html',
 ];
 

@@ -191,7 +191,10 @@ function limitationFor(tool) {
     'password-check': 'Encrypted files cannot be edited by the other tools until the password is removed.',
     'text-extract': 'Scanned pages have no text layer — OCR is required and is not part of this tool.',
     'pdf-to-text': 'Scanned pages produce no text. Use the viewer’s OCR option for those.',
-    'text-to-pdf': 'Standard PDF fonts cover Latin-1 only, so other scripts are replaced with “?”.'
+    'text-to-pdf': 'Standard PDF fonts cover Latin-1 only, so other scripts are replaced with “?”.',
+    'ocr-pdf': 'The recognition engine (~7 MB, English) downloads on first use — your PDF never leaves the device. Scanned pages keep their look; the recognised text is added invisibly so it can be searched and copied.',
+    'protect-pdf': 'Uses AES-256 encryption. There is no recovery if the password is lost. Removing a password requires knowing it.',
+    'form-fields': 'Lists AcroForm fields. Open the PDF in the viewer to fill them in.'
   };
   return notes[tool.id] || 'Every page is processed in memory. Very large documents may be slow on low-memory devices.';
 }
@@ -224,6 +227,8 @@ function buildParams(tool) {
       return;
     } else if (p.type === 'textarea') {
       control = `<textarea class="textarea" id="${id}" placeholder="${escapeHtml(p.placeholder || '')}">${escapeHtml(p.default || '')}</textarea>`;
+    } else if (p.type === 'password') {
+      control = `<input class="input" type="password" id="${id}" value="${escapeHtml(p.default ?? '')}" placeholder="${escapeHtml(p.placeholder || '')}" autocomplete="new-password">`;
     } else if (p.type === 'color') {
       control = `<input class="input" type="color" id="${id}" value="${escapeHtml(p.default || '#000000')}" style="padding:3px;height:34px">`;
     } else if (p.type === 'number') {
