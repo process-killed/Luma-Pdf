@@ -32,6 +32,7 @@ export class Toolbar {
     const o = this.opts;
     this.host.className = 'viewer-toolbar';
     this.host.innerHTML = `
+      <a class="tb-btn tb-home" href="index.html" aria-label="Luma PDF home" title="Home">${icon('home')}</a>
       ${o.sidebar ? `<button class="tb-btn" data-act="sidebar" aria-label="Toggle sidebar" title="Sidebar (Ctrl+B)" aria-pressed="true">${icon('sidebar')}</button>` : ''}
       ${o.pan ? `<button class="tb-btn" data-act="pan" aria-label="Hand tool — drag to move the page" title="Hand tool (H) · or hold Space" aria-pressed="false">${icon('move')}</button>` : ''}
       ${o.forms ? `<button class="tb-btn" data-act="forms" aria-label="Fill form fields" title="Fill form fields" aria-pressed="false" hidden>${icon('edit')}</button>` : ''}

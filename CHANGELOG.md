@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.3.0 — the reading chrome stays put, and pages stop going blank
+
+Reported on a 420-page slide deck viewed on a phone: the page number and tool bars slid
+away when scrolling, the ⋮ button did nothing, and pages went blank while scrolling.
+
+### Fixed
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Page number / tools bar scrolled away and vanished | The mobile bar was `position: absolute` **inside the scrolling workspace** | It is now `position: fixed` and pinned to the viewport, above the home indicator |
+| ⋮ menu did nothing on a phone | The toolbar was an `overflow: auto` container, so the dropdown was **clipped away** | No overflow container; on a phone the menu opens as a bottom sheet with 11 items, fully on screen |
+| Pages went blank while scrolling (fast or slow) | During a scroll only the *current* page was rendered; every other visible page stayed unrendered white | Every visible page now gets a cheap preview during the scroll, and a page without pixels shows a skeleton instead of a white sheet |
+| Blank white flashes when a page was released | Released canvases were zeroed and the wrapper was plain white | Released pages keep the `is-empty` skeleton state |
+| DOM and memory grew without limit on long documents | Pages were mounted and never unmounted (110 nodes for 420 pages) | Pages more than 14 away from the viewport are unmounted back to placeholders (38 nodes) |
+| Taps felt unresponsive while rendering | A page render is a long task that ran straight through a tap | Renders are queued behind interactions: queued work is dropped on input, and a new render waits ~110 ms after the last tap/scroll |
+
+### Added
+
+* **Home button** — in the viewer toolbar (desktop) and at the left of the mobile bar,
+  plus the existing menu entry.
+
+### Performance (CPU throttled 4×, 420-page deck, 390×844)
+
+| | v1.2.0 | v1.3.0 |
+| --- | --- | --- |
+| Visible pages blank during a fast scroll | 1–2 | **0** |
+| Visible pages blank during a slow scroll | 2 | **0** |
+| Mounted page nodes | 110 | **38** |
+| ⋮ menu paints after a tap mid-scroll | 777 ms | **379 ms** |
+| Homepage LCP (4× CPU) | — | **1.34 s**, CLS 0.066 |
+
+
 ## v1.2.0 — fast open, smooth scrolling, real mobile layout
 
 Everything here is about the two things you reported: a long wait before the first page,

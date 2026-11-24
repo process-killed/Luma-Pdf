@@ -446,9 +446,9 @@ export class Viewer {
     for (let i = first; i <= last; i++) {
       const num = i + 1;
       if (busy) {
-        // Scrolling: a cheap preview of the page under the reader only. Pages that are
-        // about to fly past are not worth a single device pixel.
-        if (num === this.current) this.requestRender(num, false, 'preview');
+        // Scrolling: every page on screen gets a cheap preview, so nothing the reader
+        // can see is ever left blank. Pages that already have pixels are skipped.
+        this.requestRender(num, false, 'preview');
         continue;
       }
       this.requestRender(num, force);
@@ -460,6 +460,7 @@ export class Viewer {
       }, 120);
     }
     this.trimCache();
+    if (!busy) this.unmountDistant(first, last);
   }
 
   requestRender(num, force = false, quality = 'full') {
@@ -473,6 +474,15 @@ export class Viewer {
     }
     this.queue.run(async () => {
       if (this.destroyed) return;
+      if (!force) {
+        // Never begin a long render on top of an interaction: a tap or a swipe must be
+        // painted first (this is what INP measures).
+        const since = performance.now() - Math.max(this._lastInteraction || 0, this._lastScrollAt || 0);
+        if (since < 100) {
+          await new Promise((r) => setTimeout(r, Math.min(160, 110 - since)));
+          if (this.destroyed) return;
+        }
+      }
       if (quality === 'full' && !this.visible.has(num) && !force && pv.quality !== 'full') return;
       if (quality === 'preview' && pv.rendered) return;
       if (quality === 'full' && pv.rendered && !pv.stale && !force && pv.quality === 'full') return;
@@ -507,6 +517,24 @@ export class Viewer {
     }
   }
 
+  /** Replace far-away page nodes with placeholders: DOM and memory stay flat. */
+  unmountDistant(first, last) {
+    const keep = 14;
+    const from = first - keep;
+    const to = last + keep;
+    for (let i = 0; i < this.pages.length; i++) {
+      const num = i + 1;
+      if (num >= from && num <= to) continue;
+      const pv = this.pages[i];
+      if (!pv.wrap || pv.rendering) continue;
+      pv.release();
+      const ph = pv.createPlaceholder();
+      pv.wrap.replaceWith(ph);
+      pv.wrap = null;
+      this.layers?.delete?.(num);
+    }
+  }
+
   trimCache() {
     const limit = Math.max(3, this.profile.cachePages || 4);
     let guard = 0;
@@ -524,6 +552,14 @@ export class Viewer {
 
   /* ---------- Navigation ---------- */
   attachInteractions() {
+    const touch = () => {
+      this._lastInteraction = performance.now();
+      // Drop renders that have not started yet: the reader is doing something else and
+      // renderVisible() will ask again when they stop.
+      if (this.queue.pending > 0) this.queue.clear();
+    };
+    ['pointerdown', 'wheel', 'keydown', 'touchstart'].forEach((evt) =>
+      this.workspace.addEventListener(evt, touch, { passive: true, capture: true }));
     this._onScroll = () => this.onScrollFrame(false);
     this.workspace.addEventListener('scroll', this._onScroll, { passive: true });
 

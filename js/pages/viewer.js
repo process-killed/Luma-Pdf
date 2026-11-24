@@ -171,10 +171,14 @@ async function loadForms() {
     const bytes = await sourceBytes();
     // A quick byte sniff catches most files; object streams hide /AcroForm, so small
     // documents are checked properly as well (large ones are not worth the parse).
-    const worthParsing = hasAcroForm(bytes) || bytes.length < 25 * 1024 * 1024;
+    const worthParsing = hasAcroForm(bytes) || bytes.length < 8 * 1024 * 1024;
     if (!worthParsing) return;
-    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 600));
-    await new Promise((resolve) => idle(resolve, { timeout: 1500 }));
+    // Wait for a quiet moment: parsing a form with pdf-lib is a long task and would
+    // show up as a slow first tap if it ran while the reader is scrolling.
+    await new Promise((resolve) => {
+      const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+      idle(resolve, { timeout: 2500 });
+    });
     if (S.forms || !S.doc) return;
     await loadPdfLib();
     const { FormLayer } = await loadFeature('../viewer/forms.js');

@@ -25,30 +25,30 @@
     } catch (e) { /* ignore */ }
   })();
 </script>
-<link rel="stylesheet" href="css/tokens.css?v=1.2.0">
-<link rel="stylesheet" href="css/reset.css?v=1.2.0">
-<link rel="stylesheet" href="css/themes.css?v=1.2.0">
-<link rel="stylesheet" href="css/main.css?v=1.2.0">
-<link rel="stylesheet" href="css/layout.css?v=1.2.0">
-<link rel="stylesheet" href="css/viewer.css?v=1.2.0">
-<link rel="stylesheet" href="css/toolbar.css?v=1.2.0">
-<link rel="stylesheet" href="css/sidebar.css?v=1.2.0">
-<link rel="stylesheet" href="css/annotations.css?v=1.2.0">
-<link rel="stylesheet" href="css/animations.css?v=1.2.0">
-<link rel="stylesheet" href="css/responsive.css?v=1.2.0">
+<link rel="stylesheet" href="css/tokens.css?v=1.3.0">
+<link rel="stylesheet" href="css/reset.css?v=1.3.0">
+<link rel="stylesheet" href="css/themes.css?v=1.3.0">
+<link rel="stylesheet" href="css/main.css?v=1.3.0">
+<link rel="stylesheet" href="css/layout.css?v=1.3.0">
+<link rel="stylesheet" href="css/viewer.css?v=1.3.0">
+<link rel="stylesheet" href="css/toolbar.css?v=1.3.0">
+<link rel="stylesheet" href="css/sidebar.css?v=1.3.0">
+<link rel="stylesheet" href="css/annotations.css?v=1.3.0">
+<link rel="stylesheet" href="css/animations.css?v=1.3.0">
+<link rel="stylesheet" href="css/responsive.css?v=1.3.0">
 <!-- Critical modules start downloading while the first script is still parsing. -->
-<link rel="modulepreload" href="js/app.js?v=1.2.0">
-<link rel="modulepreload" href="js/config.js?v=1.2.0">
-<link rel="modulepreload" href="js/state.js?v=1.2.0">
-<link rel="modulepreload" href="js/theme.js?v=1.2.0">
-<link rel="modulepreload" href="js/viewer/pdf-engine.js?v=1.2.0">
-<link rel="modulepreload" href="js/viewer/viewer.js?v=1.2.0">
-<link rel="modulepreload" href="js/viewer/renderer.js?v=1.2.0">
-<link rel="modulepreload" href="js/viewer/toolbar.js?v=1.2.0">
-<link rel="modulepreload" href="js/ui/ui.js?v=1.2.0">
-<link rel="modulepreload" href="js/ui/icons.js?v=1.2.0">
-<link rel="modulepreload" href="js/utils/dom.js?v=1.2.0">
-<link rel="modulepreload" href="js/utils/pdflib.js?v=1.2.0">
+<link rel="modulepreload" href="js/app.js?v=1.3.0">
+<link rel="modulepreload" href="js/config.js?v=1.3.0">
+<link rel="modulepreload" href="js/state.js?v=1.3.0">
+<link rel="modulepreload" href="js/theme.js?v=1.3.0">
+<link rel="modulepreload" href="js/viewer/pdf-engine.js?v=1.3.0">
+<link rel="modulepreload" href="js/viewer/viewer.js?v=1.3.0">
+<link rel="modulepreload" href="js/viewer/renderer.js?v=1.3.0">
+<link rel="modulepreload" href="js/viewer/toolbar.js?v=1.3.0">
+<link rel="modulepreload" href="js/ui/ui.js?v=1.3.0">
+<link rel="modulepreload" href="js/ui/icons.js?v=1.3.0">
+<link rel="modulepreload" href="js/utils/dom.js?v=1.3.0">
+<link rel="modulepreload" href="js/utils/pdflib.js?v=1.3.0">
 
 <script>
   try {
@@ -110,6 +110,9 @@
       <div class="page-pill" id="page-pill" data-visible="false">Page 1 of 1</div>
 
       <div class="mobile-bar" id="mobile-bar">
+        <a class="tb-btn" href="index.html" aria-label="Luma PDF home" title="Home">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+        </a>
         <button class="tb-btn" data-mobile="prev" aria-label="Previous page">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -139,6 +142,6 @@
 <div class="toast-host" aria-live="polite"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script type="module" src="js/pages/viewer.js?v=1.2.0"></script>
+<script type="module" src="js/pages/viewer.js?v=1.3.0"></script>
 </body>
 </html>

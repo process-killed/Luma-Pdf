@@ -124,7 +124,7 @@ body.viewer-page { overflow: hidden; }
 
 /* Mobile viewer bar */
 .mobile-bar {
-  display: none; position: absolute; left: 0; right: 0; bottom: 0; z-index: 16;
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
   background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
   backdrop-filter: blur(12px); border-top: 1px solid var(--surface-border);
@@ -185,4 +185,26 @@ body.viewer-page { overflow: hidden; }
 .form-bar .form-bar-text { color: var(--text-secondary); white-space: nowrap; }
 @media (max-width: 860px) {
   .form-bar { bottom: 64px; font-size: 11px; }
+}
+
+/* A page that has no pixels yet shows a quiet skeleton, never a blank white sheet. */
+.page-wrap.is-empty::after,
+.page-wrap.is-loading::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ink-150) 55%, transparent), transparent 40%),
+    linear-gradient(90deg, var(--ink-100) 0%, var(--ink-150) 50%, var(--ink-100) 100%);
+  background-size: 100% 100%, 240% 100%;
+  animation: page-skeleton 1.15s ease-in-out infinite;
+  opacity: .85;
+}
+.page-wrap.rendered::after { content: none; }
+@keyframes page-skeleton { 0% { background-position: 0 0, 120% 0; } 100% { background-position: 0 0, -120% 0; } }
+:root[data-theme="dark"] .page-wrap.is-empty::after,
+:root[data-theme="dark"] .page-wrap.is-loading::after {
+  background: linear-gradient(90deg, #1c1c24 0%, #262630 50%, #1c1c24 100%);
+  background-size: 240% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-wrap.is-empty::after, .page-wrap.is-loading::after { animation: none; }
 }

@@ -2,7 +2,7 @@
 
 A universal PDF workspace that runs entirely in the browser: read, search, annotate, edit, convert, and embed PDFs without uploading anything.
 
-**v1.2.0** · static files · no build step · no backend · no account
+**v1.3.0** · static files · no build step · no backend · no account
 
 ---
 
@@ -18,6 +18,10 @@ A universal PDF workspace that runs entirely in the browser: read, search, annot
   the sharp pass follows when you stop.
 * Phones render at a capped pixel budget (1.5× DPR, 3 MP/page), which is invisible on a
   small screen and roughly halves the work per page.
+* Pages far from the viewport are unmounted, so a 400-page document keeps ~38 page nodes
+  instead of 400.
+* Rendering always yields to input: queued renders are dropped when you tap or scroll, and
+  a new render waits for the interaction to paint.
 * Open `performance` marks in DevTools (`luma:module`, `luma:pdf-parsed`,
   `luma:first-page`) to see exactly where time goes on your own device.
 

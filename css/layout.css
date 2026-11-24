@@ -8,7 +8,7 @@
 /* Header */
 .site-header {
   position: sticky; top: 0; z-index: var(--z-header);
-  height: var(--header-h); display: flex; align-items: center;
+  height: var(--header-h); min-height: var(--header-h); display: flex; align-items: center;
   background: color-mix(in srgb, var(--bg) 86%, transparent);
   backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--surface-border);

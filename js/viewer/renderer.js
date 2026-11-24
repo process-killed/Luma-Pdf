@@ -187,6 +187,7 @@ export class PageView {
         this.rendered = true;
         this.stale = false;
         this.quality = quality;
+        this.wrap?.classList.remove('is-empty');
         this.wrap.classList.add('rendered');
         this.wrap.dataset.stale = 'false';
         this.redrawSearch();
@@ -263,6 +264,7 @@ export class PageView {
     this.stale = true;
     this.rendering = null;
     this.wrap?.classList.remove('rendered');
+    this.wrap?.classList.add('is-empty');     // shows the skeleton, not a blank sheet
     this.wrap?.removeAttribute('data-stale');
     this.clearSearch();
   }

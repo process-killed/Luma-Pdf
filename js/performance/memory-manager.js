@@ -15,7 +15,13 @@ export class TaskQueue {
       Promise.resolve()
         .then(job.task)
         .then(job.resolve, job.reject)
-        .finally(() => { this.running--; this.pump(); });
+        .finally(async () => {
+          this.running--;
+          // Give the browser a turn between page renders so a tap or a scroll is
+          // handled immediately instead of waiting behind the whole queue (INP).
+          await new Promise((r) => setTimeout(r, 0));
+          this.pump();
+        });
     }
   }
   clear() { this.queue = []; }
