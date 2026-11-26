@@ -530,7 +530,13 @@ export class Viewer {
       pv.release();
       const ph = pv.createPlaceholder();
       pv.wrap.replaceWith(ph);
+      // Drop every reference to the removed nodes: a stale layer must never be written to.
       pv.wrap = null;
+      pv.canvas = null;
+      pv.annotEl = null;
+      pv.textLayerEl = null;
+      pv.searchEl = null;
+      pv.textLayerScale = 0;
       this.layers?.delete?.(num);
     }
   }

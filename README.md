@@ -2,7 +2,7 @@
 
 A universal PDF workspace that runs entirely in the browser: read, search, annotate, edit, convert, and embed PDFs without uploading anything.
 
-**v1.5.0** · static files · no build step · no backend · no account
+**v1.5.1** · static files · no build step · no backend · no account
 
 ---
 

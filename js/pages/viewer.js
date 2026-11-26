@@ -152,6 +152,8 @@ function setZen(on) {
 
 /** A tap in the top strip restores the toolbar, the touch equivalent of hovering it. */
 function watchZenEdge() {
+  if (S._zenEdgeWired) return;
+  S._zenEdgeWired = true;
   els.app.addEventListener('pointerdown', (e) => {
     if (els.app.dataset.zen !== 'true') return;
     if (e.clientY > 64) return;
@@ -178,7 +180,9 @@ function togglePan() {
   const on = !S.viewer.panMode;
   S.viewer.setPanMode(on);
   S.toolbar.setPanPressed(on);
-  if (on) setTool('select');
+  // Pan mode already turns off the annotation layer in CSS. Switching the tool to
+  // "select" here used to strand the reader there — they would come back from the hand
+  // tool and find that drawing did nothing.
   toast(on
     ? 'Hand tool on — drag to move the page (or hold Space to pan temporarily)'
     : 'Hand tool off', { duration: 2400 });
@@ -380,7 +384,10 @@ function buildAnnotBar() {
 }
 
 function useTool(id) {
-  if (!S.annots) return;
+  if (!S.annots) {
+    toast('Annotations are still loading — one moment.', { type: 'info', duration: 2000 });
+    return;
+  }
   ensureAnnotBar();
   if (els.annotBar.dataset.open !== 'true') {
     els.annotBar.dataset.open = 'true';
@@ -638,15 +645,19 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
     onState: onSearchState
   });
 
+  // Finish writing the previous document's marks before switching, then start clean.
+  flushAnnotations();
   const { AnnotationManager } = await loadFeature('../viewer/annotations.js');
+  try { S.annots?.destroy?.(); } catch { /* previous document */ }
+  S._pendingAnnots = null;
   S.annots = new AnnotationManager({
     viewer: S.viewer,
     onChange: (items) => {
-      // Persist lazily: a stroke or a drag fires many small changes.
+      // Persist lazily: a stroke or a drag fires many small changes. The key is captured
+      // now, because by the time the timer fires the reader may have opened another file.
+      S._pendingAnnots = { key: S.docKey, items };
       clearTimeout(S._saveAnnTimer);
-      S._saveAnnTimer = setTimeout(() => {
-        if (S.docKey) saveAnnotations(S.docKey, S.annots.items).catch(() => {});
-      }, 500);
+      S._saveAnnTimer = setTimeout(flushAnnotations, 500);
       clearTimeout(S._annotListTimer);
       S._annotListTimer = setTimeout(renderAnnotList, 220);
     },
@@ -692,14 +703,17 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   attachPersistence();
   watchZenEdge();
   // A dropdown and the annotation palette must never be open at the same time.
-  document.addEventListener('luma:menu-open', () => {
-    // Close the palette directly: calling toggleAnnotations() would close the menu we
-    // are reacting to.
-    if (els.annotBar.dataset.open === 'true') {
-      els.annotBar.dataset.open = 'false';
-      S.toolbar?.setAnnotPressed(false);
-    }
-  });
+  if (!S._menuCloseWired) {
+    S._menuCloseWired = true;
+    document.addEventListener('luma:menu-open', () => {
+      // Close the palette directly: calling toggleAnnotations() would close the menu we
+      // are reacting to.
+      if (els.annotBar.dataset.open === 'true') {
+        els.annotBar.dataset.open = 'false';
+        S.toolbar?.setAnnotPressed(false);
+      }
+    });
+  }
   document.title = `${name} — Luma PDF`;
 
   // Panels are secondary: hydrate them once the first page is on screen so the
@@ -754,6 +768,8 @@ function onViewerEvent(type, detail) {
     S.search?.refresh();
   } else if (type === 'pageRendered') {
     if (!S._firstPaint) { S._firstPaint = true; mark('first-page'); }
+    // A remounted page has a brand-new annotation layer: wire it and draw its marks.
+    S.annots?.attachPage(detail.page);
     if (S.forms?.visible) S.forms.renderPage(detail.page);
   } else if (type === 'scroll') {
     els.progress.style.width = `${detail.progress * 100}%`;
@@ -765,6 +781,8 @@ function onViewerEvent(type, detail) {
 }
 
 function attachPersistence() {
+  if (S._persistenceWired) return;
+  S._persistenceWired = true;
   window.addEventListener('beforeunload', () => { savePositionNow(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') savePositionNow(); });
 }
@@ -940,6 +958,15 @@ function ensureAnnotBar() {
   buildAnnotBar();
 }
 
+/** Write any pending annotation change to the document it belongs to. */
+function flushAnnotations() {
+  clearTimeout(S._saveAnnTimer);
+  const pending = S._pendingAnnots;
+  S._pendingAnnots = null;
+  if (!pending || !pending.key) return;
+  saveAnnotations(pending.key, pending.items).catch(() => {});
+}
+
 function closeMenus() {
   document.querySelectorAll('.menu[data-open="true"]').forEach((m) => {
     m.dataset.open = 'false';
@@ -948,6 +975,10 @@ function closeMenus() {
 }
 
 function toggleAnnotations() {
+  if (!S.annots) {
+    toast(S.doc ? 'Annotations are still loading — one moment.' : 'Open a PDF first, then annotate.', { type: 'info', duration: 2400 });
+    return;
+  }
   ensureAnnotBar();
   closeMenus();
   const open = els.annotBar.dataset.open === 'true';

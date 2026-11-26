@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.5.1 — annotations stop dying mid-session
+
+Reported as "annotations work, then suddenly stop working". Three separate causes, all
+reproduced and fixed.
+
+### Fixed
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Drawing stopped working after scrolling away and back on a long document | Pages are unmounted when far from the viewport (to keep the DOM small) and get a **brand-new** annotation layer when they return. The layer was wired once at open, so the new layer had no pointer handlers, no active tool and no zoom transform | `AnnotationManager.attachPage()` re-wires any page when it is (re)mounted; the viewer calls it on every `pageRendered`. Selection, moving and resizing are re-wired too |
+| Drawing stopped after using the hand tool | Turning pan on also forced the tool to "select", and turning it off never restored it — you were silently left in select mode | Pan mode no longer touches the tool; CSS already disables the layer while panning |
+| Marks from one file appeared on the next file you opened | The debounced annotation save used the *current* document key at write time, so a save that landed after switching files was stored under the new file | The key is captured when the change happens, and pending saves are flushed before a new document loads |
+| Tool buttons did nothing while the document was still loading | `useTool()` returned silently when the annotation module had not finished loading | It now says so instead of doing nothing |
+
+### Also fixed
+
+* Stale node references are cleared when a page is unmounted, so nothing can write to a
+  detached layer.
+* Keyboard, zen-edge and menu listeners are attached **once per page session**, not once
+  per opened document — reopening a file used to double them, which made `H` (pan) toggle
+  twice and appear dead.
+* The previous document's annotation manager is destroyed when a new file opens.
+
+### Verified
+
+* 8 consecutive draws across 8 scroll positions of a 420-page document: 8/8.
+* Draw → search → pan toggle → zoom round trip → tool switching → palette reopen → page
+  jump → export: all 8 still draw.
+* Draw → scroll 90 000 px away → return → draw: works, layer back in `draw` mode with the
+  right transform.
+* Reload the same file: marks restored. Open another file: 0 marks carried over.
+
+
 ## v1.5.0 — every viewer feature is reachable on a phone
 
 ### Fixed

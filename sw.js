@@ -1,6 +1,6 @@
 /* Luma PDF service worker — offline application shell.
    Documents you save are stored by the page in IndexedDB, not here. */
-const VERSION = 'luma-pdf-v1.5.0';
+const VERSION = 'luma-pdf-v1.5.1';
 const SHELL_CACHE = VERSION + '-shell';
 const RUNTIME_CACHE = VERSION + '-runtime';
 

@@ -43,12 +43,7 @@ export class AnnotationManager {
   setTool(tool) {
     this.tool = tool;
     this.select(null);
-    this.viewer.pages.forEach((pv) => {
-      if (!pv.annotEl) return;
-      pv.annotEl.dataset.mode = INK_TYPES.has(tool) || DRAG_TYPES.has(tool) ? 'draw'
-        : CLICK_TYPES.has(tool) ? 'click' : 'select';
-      pv.annotEl.dataset.selectable = tool === 'select' ? 'true' : 'false';
-    });
+    this.viewer.pages.forEach((pv) => this.applyModeToLayer(pv));
   }
 
   setColor(color) { this.color = color; this.applyToSelected({ color }); }
@@ -167,6 +162,35 @@ export class AnnotationManager {
     });
     this.setTool(this.tool);
     this.renderAll();
+  }
+
+  /**
+   * Wire one page's layer. Pages are unmounted when they scroll far away (to keep the
+   * DOM small) and get a fresh layer when they come back, so this must be callable
+   * again for any page — that is what used to make annotations stop working.
+   */
+  attachPage(num) {
+    const pv = this.viewer.pages[num - 1];
+    if (!pv || !pv.annotEl) return;
+    this.styleLayer(pv);
+    if (!this.attached.has(pv.annotEl)) {
+      this.attached.add(pv.annotEl);
+      this.wireLayer(pv);
+      this.enableSelectInteractions(num);
+      this.applyModeToLayer(pv);
+      this.renderPage(num);
+      return;
+    }
+    this.applyModeToLayer(pv);
+  }
+
+  applyModeToLayer(pv) {
+    const el = pv.annotEl;
+    if (!el) return;
+    const tool = this.tool;
+    el.dataset.mode = INK_TYPES.has(tool) || DRAG_TYPES.has(tool) ? 'draw'
+      : CLICK_TYPES.has(tool) ? 'click' : 'select';
+    el.dataset.selectable = tool === 'select' ? 'true' : 'false';
   }
 
   /** Keep the layer's transform in sync with the viewer zoom (one style write). */
@@ -634,9 +658,10 @@ export class AnnotationManager {
   }
 
   /* ---------- drag to move in select mode ---------- */
-  enableSelectInteractions() {
-    this.viewer.pages.forEach((pv) => {
-      if (!pv.annotEl || pv.annotEl.dataset.moveBound) return;
+  enableSelectInteractions(num = null) {
+    const pages = num ? [this.viewer.pages[num - 1]] : this.viewer.pages;
+    pages.forEach((pv) => {
+      if (!pv || !pv.annotEl || pv.annotEl.dataset.moveBound) return;
       pv.annotEl.dataset.moveBound = '1';
       pv.annotEl.addEventListener('pointerdown', (e) => {
         if (this.tool !== 'select') return;
