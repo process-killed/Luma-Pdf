@@ -117,11 +117,7 @@ function buildToolbar() {
     onDownload: downloadOriginal,
     onPrint: printDocument,
     onFullscreen: toggleFullscreen,
-    onZen: () => {
-      const on = els.app.dataset.zen !== 'true';
-      els.app.dataset.zen = on ? 'true' : 'false';
-      toast(on ? 'Distraction-free mode — hover the top edge to bring the toolbar back' : 'Toolbar restored', { duration: 2200 });
-    },
+    onZen: () => setZen(els.app.dataset.zen !== 'true'),
     onOpenFile: () => els.fileInput.click(),
     onOpenUrl: promptOpenUrl,
     onCopyText: copyPageText,
@@ -133,6 +129,34 @@ function buildToolbar() {
     onSaveToLibrary: saveToLibrary
   }).mount();
   S.toolbar.setMode(store.get('mode') || 'vertical');
+}
+
+/** Distraction-free mode, with a way out that works without a mouse. */
+function setZen(on) {
+  els.app.dataset.zen = on ? 'true' : 'false';
+  let exit = document.getElementById('zen-exit');
+  if (on && !exit) {
+    exit = document.createElement('button');
+    exit.id = 'zen-exit';
+    exit.className = 'zen-exit';
+    exit.type = 'button';
+    exit.innerHTML = `${icon('chevron-down', 'icon-sm')}<span>Exit</span>`;
+    exit.setAttribute('aria-label', 'Leave distraction-free mode');
+    exit.addEventListener('click', (e) => { e.stopPropagation(); setZen(false); });
+    els.app.append(exit);
+  } else if (!on && exit) {
+    exit.remove();
+  }
+  if (on) toast('Distraction-free mode — tap “Exit” (or the top edge) to bring the toolbar back', { duration: 3000 });
+}
+
+/** A tap in the top strip restores the toolbar, the touch equivalent of hovering it. */
+function watchZenEdge() {
+  els.app.addEventListener('pointerdown', (e) => {
+    if (els.app.dataset.zen !== 'true') return;
+    if (e.clientY > 64) return;
+    setZen(false);
+  }, { passive: true });
 }
 
 /** Cheap byte sniff: a PDF with form fields mentions /AcroForm in its objects. */
@@ -666,6 +690,16 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   loadForms();
   bindKeys();
   attachPersistence();
+  watchZenEdge();
+  // A dropdown and the annotation palette must never be open at the same time.
+  document.addEventListener('luma:menu-open', () => {
+    // Close the palette directly: calling toggleAnnotations() would close the menu we
+    // are reacting to.
+    if (els.annotBar.dataset.open === 'true') {
+      els.annotBar.dataset.open = 'false';
+      S.toolbar?.setAnnotPressed(false);
+    }
+  });
   document.title = `${name} — Luma PDF`;
 
   // Panels are secondary: hydrate them once the first page is on screen so the
@@ -906,8 +940,16 @@ function ensureAnnotBar() {
   buildAnnotBar();
 }
 
+function closeMenus() {
+  document.querySelectorAll('.menu[data-open="true"]').forEach((m) => {
+    m.dataset.open = 'false';
+    m.parentElement?.querySelector('[aria-expanded]')?.setAttribute('aria-expanded', 'false');
+  });
+}
+
 function toggleAnnotations() {
   ensureAnnotBar();
+  closeMenus();
   const open = els.annotBar.dataset.open === 'true';
   els.annotBar.dataset.open = open ? 'false' : 'true';
   S.toolbar.setAnnotPressed(!open);
@@ -1086,18 +1128,24 @@ function parsePageSpec(spec, total) {
 async function printDocument() {
   if (!S.doc) return;
   const total = S.doc.numPages;
+  // Open the print window inside the click, before any await: a window opened after an
+  // await is blocked on phones (and on iOS the whole gesture is lost).
+  const win = window.open('', '_blank');
+  if (!win) {
+    toast('Your browser blocked the print window. Allow pop-ups for this site, or use Download instead.', { type: 'error', duration: 6000 });
+    return;
+  }
+  win.document.write('<title>Preparing print…</title><p style="font:16px system-ui;padding:24px">Preparing pages for print…</p>');
   if (total > 60) {
     const ok = await confirmDialog({
       title: `Print ${total} pages?`,
       message: 'Printing renders every page on this device, which can take a while and use a lot of memory on low-end hardware. Continue?',
       confirmLabel: 'Render and print'
     });
-    if (!ok) return;
+    if (!ok) { try { win.close(); } catch { /* ignore */ } return; }
   }
   const stop = toast('Preparing pages for print…', { duration: 0 });
   try {
-    const win = window.open('', '_blank');
-    if (!win) { stop.close(); toast('Your browser blocked the print window. Allow pop-ups for this site.', { type: 'error' }); return; }
     const images = [];
     for (let i = 1; i <= total; i++) {
       const page = await S.doc.getPage(i);
@@ -1254,11 +1302,6 @@ function bindKeys() {
     zoomOut: () => S.viewer?.zoomOut().then(syncZoom),
     fitWidth: () => S.viewer?.fitWidth().then(syncZoom),
     fitPage: () => S.viewer?.fitPage().then(syncZoom),
-    escape: () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (els.annotBar.dataset.open === 'true') toggleAnnotations();
-      else S.toolbar.closeSearch();
-    },
     sidebar: () => toggleSidebar(),
     fullscreen: () => toggleFullscreen(),
     rotate: () => S.viewer?.rotate(90),
@@ -1280,7 +1323,14 @@ function bindKeys() {
     toolSignature: () => drawSignature(),
     duplicate: () => S.annots?.duplicateSelected(),
     deleteSelected: () => S.annots?.deleteSelected(),
-    zen: () => S.toolbar.host.querySelector('[data-act="zen"]').click()
+    zen: () => setZen(els.app.dataset.zen !== 'true'),
+    escape: () => {
+      if (document.fullscreenElement) { document.exitFullscreen?.(); return; }
+      if (els.app.dataset.zen === 'true') { setZen(false); return; }
+      if (els.annotBar.dataset.open === 'true') { toggleAnnotations(); return; }
+      if (S.toolbar?.refs.searchBox?.dataset.open === 'true') { S.toolbar.closeSearch(); return; }
+      if (S.annots?.selectedId) S.annots.select(null);
+    }
   }, { enabled: store.get('shortcutsEnabled') !== false }).attach();
 }
 

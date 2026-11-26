@@ -1,10 +1,12 @@
 /* Luma PDF service worker — offline application shell.
    Documents you save are stored by the page in IndexedDB, not here. */
-const VERSION = 'luma-pdf-v1.3.0';
+const VERSION = 'luma-pdf-v1.5.0';
 const SHELL_CACHE = VERSION + '-shell';
 const RUNTIME_CACHE = VERSION + '-runtime';
 
 // Cached during install: the app shell only, so the first load is fast.
+// Cached during install: pages and styles only (~150 KB), so a first visit is fast.
+// Cached during install: pages and styles only (~150 KB), so a first visit is fast.
 // Cached during install: pages and styles only (~150 KB), so a first visit is fast.
 // Cached during install: pages and styles only (~150 KB), so a first visit is fast.
 // Cached during install: pages and styles only (~150 KB), so a first visit is fast.

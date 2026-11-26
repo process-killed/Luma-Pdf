@@ -188,8 +188,7 @@ body.viewer-page { overflow: hidden; }
 }
 
 /* A page that has no pixels yet shows a quiet skeleton, never a blank white sheet. */
-.page-wrap.is-empty::after,
-.page-wrap.is-loading::after {
+.page-wrap:not(.rendered)::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--ink-150) 55%, transparent), transparent 40%),
@@ -208,3 +207,17 @@ body.viewer-page { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .page-wrap.is-empty::after, .page-wrap.is-loading::after { animation: none; }
 }
+
+/* Distraction-free mode: an exit that works without a mouse. */
+.zen-exit {
+  position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 12px; z-index: 70;
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 36px; padding: 0 12px 0 10px;
+  font-size: var(--fs-xs); font-weight: 550; color: var(--text-inverse);
+  background: color-mix(in srgb, var(--ink-900) 82%, transparent);
+  border: 1px solid rgba(255,255,255,.14); border-radius: var(--r-pill);
+  box-shadow: var(--shadow-md); backdrop-filter: blur(8px);
+  opacity: .92;
+}
+.zen-exit:hover { opacity: 1; }
+.zen-exit svg { transform: rotate(180deg); }

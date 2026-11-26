@@ -69,7 +69,7 @@ export class PageView {
 
   mount(parent, { withTextLayer = true } = {}) {
     const wrap = document.createElement('div');
-    wrap.className = 'page-wrap';
+    wrap.className = 'page-wrap is-loading';
     wrap.dataset.page = String(this.num);
     wrap.setAttribute('role', 'region');
     wrap.setAttribute('aria-label', `Page ${this.num}`);
@@ -198,6 +198,12 @@ export class PageView {
         }
       } finally {
         this.rendering = null;
+        // Whatever happened (cancelled, superseded, failed) the page must never be a
+        // plain white rectangle: either it has pixels or it shows the skeleton.
+        if (!this.rendered) {
+          this.wrap?.classList.remove('is-loading');
+          this.wrap?.classList.add('is-empty');
+        }
       }
     })();
     return this.rendering;

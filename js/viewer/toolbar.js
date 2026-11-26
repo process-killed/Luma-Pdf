@@ -34,7 +34,7 @@ export class Toolbar {
     this.host.innerHTML = `
       <a class="tb-btn tb-home" href="index.html" aria-label="Luma PDF home" title="Home">${icon('home')}</a>
       ${o.sidebar ? `<button class="tb-btn" data-act="sidebar" aria-label="Toggle sidebar" title="Sidebar (Ctrl+B)" aria-pressed="true">${icon('sidebar')}</button>` : ''}
-      ${o.pan ? `<button class="tb-btn" data-act="pan" aria-label="Hand tool — drag to move the page" title="Hand tool (H) · or hold Space" aria-pressed="false">${icon('move')}</button>` : ''}
+      ${o.pan ? `<button class="tb-btn tb-collapse" data-act="pan" aria-label="Hand tool — drag to move the page" title="Hand tool (H) · or hold Space" aria-pressed="false">${icon('move')}</button>` : ''}
       ${o.forms ? `<button class="tb-btn" data-act="forms" aria-label="Fill form fields" title="Fill form fields" aria-pressed="false" hidden>${icon('edit')}</button>` : ''}
       ${o.title ? `<div class="tb-title">
         <span class="doc-name" data-ref="docName">No document</span>
@@ -64,7 +64,7 @@ export class Toolbar {
         <button class="tb-btn tb-hide-mobile" data-act="zoom-in" aria-label="Zoom in" title="Zoom in">${icon('plus')}</button>
       </div>
       <div class="menu-host">
-        <button class="tb-btn" data-menu-trigger data-act="view-menu" aria-label="View options" aria-expanded="false" title="View options">${icon('grid')}</button>
+        <button class="tb-btn tb-collapse" data-menu-trigger data-act="view-menu" aria-label="View options" aria-expanded="false" title="View options">${icon('grid')}</button>
         <div class="menu" data-ref="viewMenu">
           <div class="menu-label">Page layout</div>
           ${MODES.map((m) => `<button class="menu-item" data-mode="${m.id}" role="menuitemradio" aria-checked="false">
@@ -82,16 +82,32 @@ export class Toolbar {
           ${['light', 'sepia', 'slate', 'dark', 'paper'].map((bg) => `<button class="menu-item" data-bg="${bg}"><span class="annot-color-dot" style="background:${bgColor(bg)}"></span><span>${bg[0].toUpperCase() + bg.slice(1)}</span></button>`).join('')}
         </div>
       </div>
-      ${o.annotations ? `<button class="tb-btn" data-act="annotations" aria-label="Annotation tools" title="Annotate" aria-pressed="false">${icon('highlighter')}</button>` : ''}
+      ${o.annotations ? `<button class="tb-btn tb-collapse" data-act="annotations" aria-label="Annotation tools" title="Annotate" aria-pressed="false">${icon('highlighter')}</button>` : ''}
       <div class="tb-group">
-        <button class="tb-btn tb-hide-mobile" data-act="zen" aria-label="Distraction-free mode" title="Distraction-free (Z)">${icon('eye')}</button>
-        ${o.print ? `<button class="tb-btn tb-hide-mobile" data-act="print" aria-label="Print" title="Print (Ctrl+P)">${icon('printer')}</button>` : ''}
-        ${o.download ? `<button class="tb-btn" data-act="download" aria-label="Download" title="Download (Ctrl+S)">${icon('download')}</button>` : ''}
-        ${o.fullscreen ? `<button class="tb-btn" data-act="fullscreen" aria-label="Fullscreen" title="Fullscreen">${icon('maximize')}</button>` : ''}
+        <button class="tb-btn tb-collapse" data-act="zen" aria-label="Distraction-free mode" title="Distraction-free (Z)">${icon('eye')}</button>
+        ${o.print ? `<button class="tb-btn tb-collapse" data-act="print" aria-label="Print" title="Print (Ctrl+P)">${icon('printer')}</button>` : ''}
+        ${o.download ? `<button class="tb-btn tb-collapse" data-act="download" aria-label="Download" title="Download (Ctrl+S)">${icon('download')}</button>` : ''}
+        ${o.fullscreen ? `<button class="tb-btn tb-collapse" data-act="fullscreen" aria-label="Fullscreen" title="Fullscreen">${icon('maximize')}</button>` : ''}
       </div>
       ${o.moreMenu === false ? '' : `<div class="menu-host">
         <button class="tb-btn" data-menu-trigger aria-label="More actions" aria-expanded="false" title="More">${icon('more-vertical')}</button>
         <div class="menu" data-ref="moreMenu">
+          <div class="menu-label">View</div>
+          ${MODES.map((m) => `<button class="menu-item" data-mode="${m.id}" role="menuitemradio" aria-checked="false">
+            ${icon(m.icon)}<span>${m.label}</span><span class="mi-check">${icon('check', 'icon-sm')}</span></button>`).join('')}
+          <div class="menu-sep"></div>
+          <button class="menu-item" data-fit="page-width">${icon('fit-width')}<span>Fit width</span></button>
+          <button class="menu-item" data-fit="page-fit">${icon('fit-page')}<span>Fit page</span></button>
+          <button class="menu-item" data-fit="actual">${icon('actual-size')}<span>Actual size</span></button>
+          <button class="menu-item" data-act="rotate">${icon('rotate-cw')}<span>Rotate view</span></button>
+          <button class="menu-item" data-act="direction">${icon('arrow-right')}<span>Toggle reading direction</span></button>
+          <button class="menu-item" data-act="zen">${icon('eye')}<span>Distraction-free mode</span></button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" data-act="search-open">${icon('search')}<span>Find in document</span></button>
+          ${o.download ? `<button class="menu-item" data-act="download">${icon('download')}<span>Download a copy</span></button>` : ''}
+          ${o.print ? `<button class="menu-item" data-act="print">${icon('printer')}<span>Print</span></button>` : ''}
+          ${o.fullscreen ? `<button class="menu-item" data-act="fullscreen">${icon('maximize')}<span>Fullscreen</span></button>` : ''}
+          <div class="menu-sep"></div>
           <button class="menu-item" data-act="open-file">${icon('upload')}<span>Open another PDF…</span></button>
           <button class="menu-item" data-act="open-url">${icon('link')}<span>Open a PDF link…</span></button>
           <div class="menu-sep"></div>
@@ -246,7 +262,7 @@ export class Toolbar {
   }
 
   setMode(mode) {
-    this.refs.viewMenu?.querySelectorAll('[data-mode]').forEach((b) => {
+    this.host.querySelectorAll('[data-mode]').forEach((b) => {
       b.setAttribute('aria-checked', b.dataset.mode === mode ? 'true' : 'false');
     });
   }

@@ -59,15 +59,25 @@
     overflow: visible;      /* never clip the dropdown menus */
   }
   .viewer-toolbar .tb-home { display: inline-flex; }
-  .viewer-toolbar [data-act="pan"],
-  .viewer-toolbar [data-act="annotations"],
-  .viewer-toolbar [data-act="download"],
-  .viewer-toolbar [data-act="print"],
-  .viewer-toolbar [data-act="fullscreen"],
-  .viewer-toolbar [data-act="zen"],
-  .viewer-toolbar [data-act="view-menu"],
+  .viewer-toolbar .tb-collapse,
   .viewer-toolbar .tb-sep,
   .viewer-toolbar .tb-title { display: none !important; }
+  /* the search field becomes its own bar instead of squeezing the toolbar */
+  .viewer-toolbar .tb-search {
+    position: fixed; left: 8px; right: 8px;
+    top: calc(env(safe-area-inset-top) + 54px);
+    z-index: 45; width: auto; max-width: none;
+    padding: 5px 6px; gap: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--surface-border-strong);
+    border-radius: var(--r-pill); box-shadow: var(--shadow-lg);
+  }
+  .viewer-toolbar .tb-search .input { width: auto; flex: 1 1 auto; min-width: 0; height: 36px; font-size: 16px; }
+  .viewer-toolbar .tb-search .tb-btn { width: 40px; height: 40px; min-width: 40px; }
+  .viewer-toolbar .tb-search .search-count { min-width: 54px; font-size: 11px; white-space: nowrap; }
+  .viewer-toolbar .tb-search [data-act="search-close"] {
+    background: var(--bg-sunken); border-radius: 50%; color: var(--text);
+  }
   .viewer-toolbar .tb-zoom { min-width: 0; }
   .viewer-toolbar .tb-zoom .tb-btn,
   .viewer-toolbar .tb-zoom .zoom-btn { display: none; }
@@ -175,3 +185,20 @@
 .mobile-bar .mb-page .input { width: 40px; height: 32px; padding: 0 2px; }
 .mobile-bar #mobile-total { font-size: 11px; letter-spacing: -.01em; }
 .mobile-bar { gap: 2px; }
+
+/* Toasts sit above the mobile bar (and the annotation sheet), never on top of them. */
+@media (max-width: 860px) {
+  .toast-host { bottom: calc(74px + env(safe-area-inset-bottom)); width: min(92vw, 420px); }
+  .annot-bar[data-open="true"] ~ .toast-host,
+  body:has(.annot-bar[data-open="true"]) .toast-host { bottom: calc(288px + env(safe-area-inset-bottom)); }
+}
+
+/* The zoom presets use the same sheet on a phone (the toolbar copy is a popover). */
+@media (max-width: 860px) {
+  .menu.zoom-menu-pop {
+    display: block; position: fixed; left: 8px; right: 8px; top: auto !important;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    max-height: 56dvh; overflow-y: auto; border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg); z-index: 60;
+  }
+}

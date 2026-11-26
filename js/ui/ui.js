@@ -159,6 +159,7 @@ export function initMenus(root = document) {
       closeAll(menu);
       menu.dataset.open = open ? 'false' : 'true';
       trigger.setAttribute('aria-expanded', String(!open));
+      if (!open) document.dispatchEvent(new CustomEvent('luma:menu-open'));
       e.preventDefault();
       return;
     }
