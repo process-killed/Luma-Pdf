@@ -161,6 +161,88 @@ function watchZenEdge() {
   }, { passive: true });
 }
 
+/* ---------------- GuidedPath ---------------- */
+/**
+ * `?studio=<tourId>` opens the creation workspace, `?play=<tourId>` starts the
+ * presentation. Both reuse this viewer, so rendering, zoom and annotations behave the
+ * same as in normal reading.
+ */
+async function maybeStartGuidedPath() {
+  const params = new URLSearchParams(location.search);
+  const studioId = params.get('studio');
+  const playId = params.get('play');
+  if (!studioId && !playId) return;
+  try {
+    const [{ getTour, saveTour, getAsset, putAsset, listAssets, pruneAssets, makeThumbnail, storeThumbnail }, storage] = await Promise.all([
+      import('../guidedpath/manager.js'),
+      import('../guidedpath/storage.js')
+    ]);
+    const tourId = studioId || playId;
+    const tour = await getTour(tourId);
+    if (!tour) { toast('That GuidedPath no longer exists on this device.', { type: 'error', duration: 5000 }); return; }
+
+    tour.pageCount = tour.pageCount || S.viewer.pages.length;
+
+    if (studioId) {
+      const { GuidedPathStudio } = await import('../guidedpath/studio.js');
+      const studio = new GuidedPathStudio({
+        viewer: S.viewer,
+        tour,
+        getAsset: (id) => getAsset(id),
+        putAsset: (data) => putAsset(data),
+        onSave: async (t) => {
+          const saved = await saveTour({ ...t, pageCount: t.pageCount || S.viewer.pages.length });
+          const thumb = await makeThumbnail(S.viewer);
+          if (thumb) await storeThumbnail(saved.id, thumb);
+          await pruneAssets(saved.id);
+          return saved;
+        },
+        onExit: () => { location.href = 'guidedpath.html'; },
+        previewTour: async (t) => startPreview(t)
+      });
+      studio.mount();
+      S.studio = studio;
+      mark('guidedpath-studio');
+      return;
+    }
+
+    // player
+    const assets = new Map();
+    const all = await listAssets(tour.id);
+    all.forEach((a) => assets.set(a.id, a));
+    const { GuidedPathPlayer } = await import('../guidedpath/player.js');
+    const player = new GuidedPathPlayer({
+      viewer: S.viewer,
+      tour,
+      getAsset: async (id) => assets.get(id) || await getAsset(id),
+      onExit: () => { location.href = 'guidedpath.html'; }
+    });
+    S.player = player;
+    await player.start(0);
+    mark('guidedpath-play');
+  } catch (err) {
+    console.error(err);
+    toast(err?.message || 'GuidedPath could not start.', { type: 'error', duration: 6000 });
+  }
+}
+
+/** Preview a tour (or a single step) without leaving the studio. */
+async function startPreview(tour, opts = {}) {
+  const { GuidedPathPlayer } = await import('../guidedpath/player.js');
+  const { getAsset } = await import('../guidedpath/manager.js');
+  const player = new GuidedPathPlayer({
+    viewer: S.viewer,
+    tour,
+    getAsset: (id) => getAsset(id),
+    onExit: () => {
+      S.previewPlayer = null;
+      if (opts.single) S.studio?.render();
+    }
+  });
+  S.previewPlayer = player;
+  await player.start(0);
+}
+
 /** Cheap byte sniff: a PDF with form fields mentions /AcroForm in its objects. */
 function hasAcroForm(bytes) {
   if (!bytes || !bytes.length) return false;
@@ -653,6 +735,22 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   S.annots = new AnnotationManager({
     viewer: S.viewer,
     onChange: (items) => {
+      // Tell the GuidedPath recorder when a new mark appears (highlight → spotlight).
+      if (S.studio && items.length > (S._annotCount || 0)) {
+        const added = items[items.length - 1];
+        const pv = S.viewer?.pages?.[added.page - 1];
+        const rect = added.rect || added;
+        if (pv?.annotEl && rect) {
+          const box = pv.annotEl.getBoundingClientRect();
+          const x = box.left + (added.x || 0) * (S.viewer.scale || 1);
+          const y = box.top + (added.y || 0) * (S.viewer.scale || 1);
+          S.studio.onViewerEvent('annotationAdded', {
+            page: added.page,
+            rect: { x, y, w: (added.w || 0) * (S.viewer.scale || 1), h: (added.h || 0) * (S.viewer.scale || 1) }
+          });
+        }
+      }
+      S._annotCount = items.length;
       // Persist lazily: a stroke or a drag fires many small changes. The key is captured
       // now, because by the time the timer fires the reader may have opened another file.
       S._pendingAnnots = { key: S.docKey, items };
@@ -685,7 +783,12 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   S.bookmarks = null;   // created in hydratePanels() once the first page is up
 
   // Small debug/integration surface (also used by the embed bridge).
-  window.LumaPDF = { viewer: S.viewer, doc: S.doc, search: S.search, annots: S.annots, state: S, version: APP.version };
+  window.LumaPDF = {
+    viewer: S.viewer, doc: S.doc, search: S.search, annots: S.annots, state: S,
+    get player() { return S.player || S.previewPlayer || null; },
+    get studio() { return S.studio || null; },
+    version: APP.version
+  };
   mark('doc-open');
 
   // Metadata and document details arrive after the first page, never before it.
@@ -703,6 +806,7 @@ async function onDocumentReady(doc, { name, size = 0, page = 0 } = {}) {
   attachPersistence();
   watchZenEdge();
   // A dropdown and the annotation palette must never be open at the same time.
+  await maybeStartGuidedPath();
   if (!S._menuCloseWired) {
     S._menuCloseWired = true;
     document.addEventListener('luma:menu-open', () => {
@@ -744,6 +848,7 @@ async function hydratePanels() {
 let saveTimer = 0;
 function onViewerEvent(type, detail) {
   if (!S.viewer) return;
+  S.studio?.onViewerEvent(type, detail);
   if (type === 'pageChanged') {
     S.toolbar.setPage(detail.page, detail.total);
     els.mobilePage.value = String(detail.page);

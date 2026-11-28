@@ -8,13 +8,13 @@ export const APP = {
   tagline: 'A universal PDF workspace that runs entirely in your browser.',
   origin: (typeof location !== 'undefined' ? location.origin + location.pathname.replace(/\/[^/]*$/, '/') : 'https://lumapdf.example/'),
   repo: 'https://github.com/',
-  version: '1.5.1',
-  build: '2026-11-26 20:05 IST',
-  buildId: 'b2026-11-26-2'
+  version: '1.7.0',
+  build: '2026-11-28 12:20 IST',
+  buildId: 'b2026-11-28-1'
 };
 
 /** Asset version query — bump together with APP.version on every real change. */
-export const ASSET_V = '1.5.1';
+export const ASSET_V = '1.7.0';
 
 export const PATHS = {
   pdfjs: 'vendor/pdfjs/pdf.min.js',
@@ -26,15 +26,27 @@ export const PATHS = {
 
 export const STORAGE = {
   dbName: 'luma-pdf',
-  dbVersion: 1,
+  dbVersion: 2,
   stores: {
     documents: 'documents',   // saved PDF blobs + metadata
     settings: 'settings',     // key/value preferences
     annotations: 'annotations', // per-document annotation sets
     bookmarks: 'bookmarks',   // per-document bookmarks
-    reading: 'reading'        // per-document reading position
+    reading: 'reading',       // per-document reading position
+    tours: 'tours',           // GuidedPath tours (steps inline)
+    tourAssets: 'tourAssets'  // narration audio + thumbnails, one record per asset
   },
   maxSavedDocuments: 60
+};
+
+export const GUIDEDPATH = {
+  formatVersion: 1,
+  formatId: 'luma-tour',
+  maxSteps: 400,
+  maxNarrationBytes: 12 * 1024 * 1024,
+  maxPackageBytes: 64 * 1024 * 1024,
+  maxTextLength: 8000,
+  narrationMimes: ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav']
 };
 
 export const PERFORMANCE = {

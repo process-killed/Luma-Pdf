@@ -7,6 +7,7 @@ import { initMenus } from './ui/ui.js';
 
 export const NAV = [
   { href: 'viewer.html', label: 'Viewer', key: 'viewer' },
+  { href: 'guidedpath.html', label: 'GuidedPath', key: 'guidedpath' },
   { href: 'tools.html', label: 'Tools', key: 'tools' },
   { href: 'editor.html', label: 'Editor', key: 'editor' },
   { href: 'embed-generator.html', label: 'Embed', key: 'embed' },

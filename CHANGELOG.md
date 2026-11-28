@@ -1,5 +1,150 @@
 # Changelog
 
+## v1.7.0 — GuidedPath: turn a PDF into a guided journey
+
+A new first-class feature: record a walkthrough of a document — pages, zooms, spotlights,
+explanations, quizzes, checkpoints and your own voice — then play it back cinematically or
+share it as a single `.lumatour` file. Everything runs in the tab.
+
+### Added
+
+* **Dashboard** (`guidedpath.html`) — create a tour from a PDF, import a `.lumatour`, search,
+  sort, rename, duplicate, export and delete tours, with thumbnails, step counts, durations,
+  last-edited dates and storage usage.
+* **Creation workspace** — `viewer.html?studio=<tourId>` adds a floating recorder
+  (record / pause / stop / undo / redo / add step / preview / save), a timeline editor with
+  drag-reorder, duplicate, delete and per-step preview, and a step inspector.
+* **Nine step types** — page navigation, spotlight (multiple regions, opacity, border,
+  animation), smart zoom, rich-text explanation, voice narration, image/diagram focus,
+  checkpoint, quiz (multiple choice, true/false, short answer with scoring) and external
+  resource (http/https only, never auto-loaded).
+* **Player** — `viewer.html?play=<tourId>`: previous/next, play/pause, restart, playback speed,
+  progress bar, step counter, captions, narration volume, fullscreen, exit. One timer and one
+  narration element, so steps can never overlap; leaving cancels every pending transition.
+* **Recording that captures meaning, not movement** — page changes are debounced, zooms are
+  only recorded above 115 % and de-duplicated, and a highlight becomes a spotlight step.
+* **`.lumatour` packages** — ZIP with a versioned manifest, thumbnail, narration assets and
+  document metadata. The PDF is never included; tours reattach by fingerprint.
+* **Normalised coordinates everywhere** — `x/y/w/h/r` between 0 and 1 of the page box, so a
+  step recorded on a phone lands correctly on a desktop monitor (verified identical at
+  1280×900 and 390×844).
+* **IndexedDB storage** — new `tours` and `tourAssets` stores (database v2, upgraded in place),
+  storage usage display, quota handling, orphaned-asset pruning.
+
+### Fixed during the build
+
+* **`scripts/inline-critical.mjs` destroyed stylesheets.** Adding a `<link>` to a page that
+  already had an inlined block replaced the whole block with just the new sheet — which
+  stripped `viewer.html` of every style. The script now merges the recorded list with any new
+  links; the viewer was restored and all 12 pages verified.
+* **`frameForRegion` scrolled to the wrong place** — it mixed `offsetTop` with scroll maths.
+  Both axes now use the same rect-based calculation.
+* **Fingerprint instability** — mixing the page count into the digest made the same file hash
+  differently at different times, so imported tours could not find their PDF. The digest is
+  now `SHA-256(size | head 64 KiB | tail 64 KiB)`.
+* **Imported tours did not remember their document** — the resolved `docId` is now saved, so a
+  re-imported tour opens straight away instead of asking for the PDF again.
+
+### Verified
+
+* Record → 2 steps captured (page + zoom) from a real scroll/zoom session.
+* Add step → quiz inspector with every field; save → 3 steps persisted with page count and fingerprint.
+* Play → step counter, page changes, zoom, spotlight, explanation panel, quiz scoring
+  ("Correct — H2O is water."), finish card, exit back to the dashboard.
+* Spotlight geometry identical across viewports (0.25 / 0.4 / 0.5 / 0.2 in both cases).
+* Export → 2.8 KB package with narration → import → 3 steps and the audio restored.
+* Wrong PDF rejected with a clear message; a corrupt file rejected as "not a valid .lumatour package".
+* Existing features unchanged: 65 tools, forms (9 → 8 applied → flattened), editor export,
+  embed messaging, mobile menu, annotations across remounts, 26 audio tools.
+
+
+## v1.6.0 — 26 audio tools, in the tab, under a new Audio category
+
+Everything is decoded with `decodeAudioData`, processed with the Web Audio API
+(`OfflineAudioContext`, `ConvolverNode`, `PannerNode`, `DynamicsCompressorNode`, `BiquadFilterNode`)
+or in plain JS, and written back as 16-bit PCM WAV. No upload, no worker farm, no backend.
+
+### Spatial & stereo
+
+| Tool | What it does |
+| --- | --- |
+| 8D audio maker | Rotating pan with a slow tremolo and optional room |
+| 3D audio effect | HRTF placement by direction and distance, with an orbit option |
+| Audio panning | Constant-power balance plus stereo width |
+| Stereo to mono | Sums both channels |
+| Mono to stereo | Haas-style width with adjustable side delay |
+
+### Reverb & delay
+
+| Tool | What it does |
+| --- | --- |
+| Reverb adder | Convolution reverb with synthesised room/hall/church/studio/plate impulse responses |
+| Echo effect maker | Feedback delay, optional ping-pong, tone-damped repeats |
+
+### Tone
+
+| Tool | What it does |
+| --- | --- |
+| Bass booster | Low shelf, up to +18 dB |
+| Treble booster | High shelf, up to +18 dB |
+| Hum remover | Notch at 50/60 Hz plus up to 8 harmonics, optional rumble cut |
+| De-esser | Compresses only the 3.5–10 kHz sibilance band and recombines |
+
+### Vocals
+
+| Tool | What it does |
+| --- | --- |
+| Vocal remover | Cancels centre content, keeps a low-passed bass bed |
+| Karaoke maker | Vocal removal plus optional room and normalisation |
+| Isolate vocals | Keeps only centre content |
+
+### Enhancement & repair
+
+| Tool | What it does |
+| --- | --- |
+| Audio enhancer | Presence + air + glue compression + a little harmonic drive |
+| Audio normalizer | Peak to a target dBFS with a safety ceiling |
+| Clipping fixer | Rebuilds flattened peaks, then limits |
+| Distortion effect | Waveshaper saturation with a tone control |
+| Compressor / limiter | Threshold, ratio, attack, release, make-up gain |
+| Audio gate | Envelope gate with hold and release |
+
+### Creative
+
+| Tool | What it does |
+| --- | --- |
+| Audio joiner with crossfade | Any number of tracks, equal-power crossfades |
+| Crossfade maker | Two tracks, adjustable fade |
+| Audio looper | Repeats a region in place |
+| Beat detector | Onset flux + normalised autocorrelation, reports BPM and beat times |
+| BPM & tempo changer | WSOLA time-stretch (pitch kept) or resample (pitch shifts) |
+| Audio spectrum visualizer | Spectrogram PNG from a real radix-2 FFT |
+
+### Engineering notes
+
+* `js/audio/wav.js` — decode, WAV encode, peak/RMS/normalise and a soft limiter.
+* `js/audio/graph.js` — OfflineAudioContext effects; the source buffer is never mutated.
+* `js/audio/dsp.js` — channel maths, gating, de-clipping, WSOLA, loops, crossfades, beat
+  detection and the FFT spectrogram.
+* `js/tools/audio.js` — the 26 tool definitions and their parameters.
+* Every output is peak-limited below 0 dBFS, so a gain-adding tool can never hand you a
+  clipped file. The result card reports the real peak and says when limiting happened.
+* The tools page accepts audio files and shows an inline player for the result.
+
+### Verified with measured audio, not just "it ran"
+
+* Bass booster: 55 Hz energy ×3.0.
+* Vocal remover: 440 Hz centre tone −62 %, 55 Hz bass kept at 96 %.
+* Normalizer: peak exactly −1.0 dBFS.
+* Pan −0.9: right channel RMS 0.030 vs left 0.382.
+* Gate at −30 dBFS: noise floor 0.00115 → 0.00000, tone unchanged.
+* Beat detector on a 120 BPM click track: 120 BPM, 7 beats.
+* Tempo 1.5×: 4.00 s → 2.67 s. Loop 2×: 4.00 s → 8.00 s.
+* Join with 1 s crossfade: 4 + 4 − 1 = 7.00 s. Crossfade 2 s: 6.00 s.
+* Echo: 5.25 s (tail added). Church reverb: 8.20 s.
+* All 26 tools produce a valid WAV (correct channels, rate, duration) with no console errors.
+
+
 ## v1.5.1 — annotations stop dying mid-session
 
 Reported as "annotations work, then suddenly stop working". Three separate causes, all

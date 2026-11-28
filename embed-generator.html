@@ -608,6 +608,14 @@ dialog.modal[open]::backdrop { animation: luma-fade-in var(--dur-3) var(--ease-o
   .preview-frame { height: 320px; }
 }
 
+/* Audio tools */
+.audio-preview {
+  border: 1px solid var(--surface-border); border-radius: var(--r-md);
+  background: var(--bg-sunken); padding: 12px;
+}
+.audio-preview audio { display: block; height: 40px; }
+.tool-tile .tt-icon[data-audio] { color: var(--brand-500); }
+
 /* css/embed.css */
 /* Embed endpoint — chrome-free viewer */
 body.embed-page { background: var(--workspace); overflow: hidden; }
@@ -980,6 +988,6 @@ body.embed-page { background: var(--workspace); overflow: hidden; }
 <footer data-shell="footer"></footer>
 <div class="toast-host" aria-live="polite"></div>
 
-<script type="module" src="js/pages/embed-generator.js?v=1.5.1"></script>
+<script type="module" src="js/pages/embed-generator.js?v=1.7.0"></script>
 </body>
 </html>

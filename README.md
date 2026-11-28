@@ -2,9 +2,35 @@
 
 A universal PDF workspace that runs entirely in the browser: read, search, annotate, edit, convert, and embed PDFs without uploading anything.
 
-**v1.5.1** · static files · no build step · no backend · no account
+**v1.7.0** · static files · no build step · no backend · no account
 
 ---
+
+## GuidedPath
+
+Turn a PDF into an interactive, narrated walkthrough. Record pages, zooms, spotlights,
+explanations, quizzes, checkpoints and your own voice, then replay it cinematically or share a
+single `.lumatour` file (a ZIP with a versioned manifest — the PDF is never inside it).
+
+* `guidedpath.html` — the library: create, import, search, rename, duplicate, export, delete.
+* `viewer.html?studio=<tourId>` — the creation workspace: recorder, timeline, step inspector.
+* `viewer.html?play=<tourId>` — the presentation: one timer, one narration track, cancellable.
+
+Positions are stored as normalised page coordinates, so a tour recorded on a phone lands in
+the same place on a desktop. Tours reattach to their PDF by a SHA-256 fingerprint of the file's
+size and first/last 64 KiB.
+
+## Audio tools
+
+26 audio utilities live under the **Audio** category on the tools page: 8D and 3D
+placement, panning, mono/stereo conversion, reverb, echo, bass and treble shelves, hum
+removal, de-essing, vocal removal, karaoke, vocal isolation, enhancement, normalisation,
+de-clipping, distortion, compression, gating, joining, crossfading, looping, beat detection,
+tempo changes and a spectrogram.
+
+They decode with `decodeAudioData`, process with `OfflineAudioContext` (or plain JS for
+sample maths) and return 16-bit PCM WAV. Nothing is uploaded, and every output is
+peak-limited below 0 dBFS so a gain-adding tool cannot hand you a clipped file.
 
 ## Performance notes
 

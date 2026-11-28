@@ -840,7 +840,8 @@ dialog.modal[open]::backdrop { animation: luma-fade-in var(--dur-3) var(--ease-o
         <p>Luma PDF is a static, browser-only PDF workspace. It has three surfaces:</p>
         <ul>
           <li><strong>Viewer</strong> (<code>viewer.html</code>) — reading, search, annotations, export.</li>
-          <li><strong>Tools</strong> (<code>tools.html</code>) — 39 utilities built on pdf-lib, PDF.js, qpdf and Tesseract.</li>
+          <li><strong>GuidedPath</strong> (<code>guidedpath.html</code>) — turn a PDF into an interactive, narrated walkthrough. Recorded steps, spotlights, smart zooms, explanations, quizzes, checkpoints and voice narration, stored locally and shared as a <code>.lumatour</code> package.</li>
+          <li><strong>Tools</strong> (<code>tools.html</code>) — 65 utilities: 39 PDF tools built on pdf-lib, PDF.js, qpdf and Tesseract, and 26 audio tools built on the Web Audio API (<code>OfflineAudioContext</code>, <code>ConvolverNode</code>, <code>PannerNode</code>, <code>DynamicsCompressorNode</code>). Audio is decoded with <code>decodeAudioData</code> and written back as 16-bit PCM WAV by <code>js/audio/wav.js</code>.</li>
           <li><strong>Embed</strong> (<code>embed.html</code>) — a chrome-light viewer configured entirely by URL parameters.</li>
         </ul>
         <p>There is no server component. Rendering uses PDF.js (Apache-2.0), editing uses pdf-lib (MIT), and both are vendored in <code>vendor/</code> so the app works offline and needs no CDN.</p>
@@ -1116,6 +1117,47 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
         <h3>Signatures</h3>
         <p>Drawn, typed or uploaded signatures are trimmed to their ink and given a transparent background. Up to eight are kept in <code>localStorage</code> on this device. They are placed as annotation images and written into the PDF on export — a visible signature, not a cryptographic one.</p>
 
+        <h2 id="guidedpath">GuidedPath</h2>
+        <p><code>guidedpath.html</code> is the library, <code>viewer.html?studio=&lt;tourId&gt;</code> is the creation
+          workspace and <code>viewer.html?play=&lt;tourId&gt;</code> is the presentation. All three reuse the normal
+          viewer, so the PDF renders, zooms and annotates exactly as it does everywhere else.</p>
+
+        <h3>The .lumatour package</h3>
+        <p>A tour exports as a ZIP with a versioned manifest. The PDF itself is never included.</p>
+        <pre><code>manifest.json           format, version, title, steps, asset references
+thumbnail.webp          first-page preview for the library
+metadata/document.json  filename, fingerprint, page count
+assets/narration/*      one audio file per narrated step</code></pre>
+
+        <h3>Document fingerprint</h3>
+        <p>A tour is tied to its PDF by <code>SHA-256(size | first 64 KiB | last 64 KiB)</code>. The page count is
+          deliberately excluded, so the same file always hashes the same. Opening a tour checks the library first,
+          then scans saved documents; if nothing matches you are asked for the PDF and the fingerprint is verified
+          before the tour is restored.</p>
+
+        <h3>Coordinates</h3>
+        <p>Every spotlight, zoom centre and highlight is stored as normalised page coordinates between 0 and 1
+          (<code>x</code>, <code>y</code>, <code>w</code>, <code>h</code>, <code>r</code>). A step recorded on a
+          phone lands in the same place on a desktop monitor at a different zoom.</p>
+
+        <h3>GuidedPath modules</h3>
+        <ul>
+          <li><code>js/guidedpath/model.js</code> — step schema, validation, migration, rich text</li>
+          <li><code>js/guidedpath/coords.js</code> — normalised ↔ pixel maths and camera framing</li>
+          <li><code>js/guidedpath/storage.js</code> — IndexedDB tours and narration assets</li>
+          <li><code>js/guidedpath/lumatour.js</code> — ZIP read/write, fingerprint, package validation</li>
+          <li><code>js/guidedpath/studio.js</code> — recorder, timeline editor, step inspector</li>
+          <li><code>js/guidedpath/player.js</code> — playback engine: one timer, cancellable transitions</li>
+          <li><code>js/guidedpath/narration.js</code>, <code>spotlight.js</code>, <code>quiz.js</code></li>
+          <li><code>js/guidedpath/manager.js</code> — document resolution, export, import, thumbnails</li>
+        </ul>
+
+        <h3>Importing untrusted tours</h3>
+        <p>Imported packages are validated before anything is stored: archive paths must be relative and free of
+          <code>..</code>, entries are capped, narration MIME types are whitelisted and size-limited, steps are
+          re-validated, and only <code>http(s)</code> external links survive. No JavaScript from a package is ever
+          executed and no external resource is loaded automatically.</p>
+
         <h2 id="limits">Limitations</h2>
         <ul>
           <li><strong>Encrypted PDFs</strong> can be read with a password, but the editing tools refuse them.</li>
@@ -1136,6 +1178,6 @@ Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges</pre
 <footer data-shell="footer"></footer>
 <div class="toast-host" aria-live="polite"></div>
 
-<script type="module" src="js/pages/docs.js?v=1.5.1"></script>
+<script type="module" src="js/pages/docs.js?v=1.7.0"></script>
 </body>
 </html>

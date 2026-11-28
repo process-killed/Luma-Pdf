@@ -120,6 +120,8 @@ export class Toolbar {
           <div class="menu-sep"></div>
           <button class="menu-item" data-act="info">${icon('info')}<span>Document properties</span></button>
           <button class="menu-item" data-act="library">${icon('folder')}<span>Save to library</span></button>
+          <div class="menu-sep"></div>
+          <a class="menu-item" href="guidedpath.html">${icon('book-open')}<span>GuidedPath — create a tour</span></a>
           <a class="menu-item" href="settings.html">${icon('settings')}<span>Viewer settings</span></a>
           <a class="menu-item" href="index.html">${icon('globe')}<span>Luma PDF home</span></a>
         </div>

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>PDF Tools — Luma PDF</title>
-<meta name="description" content="39 PDF utilities that run in your browser: merge, split, compress, OCR, protect with a password, convert to Markdown, fill forms. Nothing is uploaded.">
+<title>PDF &amp; audio tools — Luma PDF</title>
+<meta name="description" content="65 browser tools for PDF and audio: merge, split, compress, OCR, protect, convert to Markdown, fill forms, plus 26 audio tools — reverb, 8D, vocal remover, normalise, tempo, spectrogram. Nothing is uploaded.">
 <meta name="theme-color" content="#fcfcfd">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -681,6 +681,14 @@ dialog.modal[open]::backdrop { animation: luma-fade-in var(--dur-3) var(--ease-o
   .preview-frame { height: 320px; }
 }
 
+/* Audio tools */
+.audio-preview {
+  border: 1px solid var(--surface-border); border-radius: var(--r-md);
+  background: var(--bg-sunken); padding: 12px;
+}
+.audio-preview audio { display: block; height: 40px; }
+.tool-tile .tt-icon[data-audio] { color: var(--brand-500); }
+
 /* css/animations.css */
 /* Shared motion utilities */
 .fade-in { animation: luma-fade-up var(--dur-3) var(--ease-out) both; }
@@ -918,9 +926,9 @@ dialog.modal[open]::backdrop { animation: luma-fade-in var(--dur-3) var(--ease-o
   <section id="tools-catalog">
     <div class="page-head">
       <div class="container">
-        <span class="eyebrow">PDF tools</span>
+        <span class="eyebrow">PDF &amp; audio tools</span>
         <h1>Every PDF job, without an upload</h1>
-        <p><span id="tool-count">39</span> utilities that run entirely in this tab. Pick a tool, choose your file, and download the result — the original stays exactly where it is.</p>
+        <p><span id="tool-count">65</span> tools that run entirely in this tab — 39 for PDF, 26 for audio. Pick one, choose your file, and download the result. The original stays exactly where it is.</p>
         <div class="tool-filter" style="margin-top:20px">
           <div class="input-group grow" style="max-width:420px">
             <input class="input" id="tool-filter" type="search" placeholder="Search tools — merge, split, compress…" aria-label="Search tools">
@@ -941,6 +949,6 @@ dialog.modal[open]::backdrop { animation: luma-fade-in var(--dur-3) var(--ease-o
 <div class="toast-host" aria-live="polite"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script type="module" src="js/pages/tools.js?v=1.5.1"></script>
+<script type="module" src="js/pages/tools.js?v=1.7.0"></script>
 </body>
 </html>

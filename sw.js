@@ -1,10 +1,12 @@
 /* Luma PDF service worker — offline application shell.
    Documents you save are stored by the page in IndexedDB, not here. */
-const VERSION = 'luma-pdf-v1.5.1';
+const VERSION = 'luma-pdf-v1.7.0';
 const SHELL_CACHE = VERSION + '-shell';
 const RUNTIME_CACHE = VERSION + '-runtime';
 
 // Cached during install: the app shell only, so the first load is fast.
+// Cached during install: pages and styles only (~150 KB), so a first visit is fast.
+// Cached during install: pages and styles only (~150 KB), so a first visit is fast.
 // Cached during install: pages and styles only (~150 KB), so a first visit is fast.
 // Cached during install: pages and styles only (~150 KB), so a first visit is fast.
 // Cached during install: pages and styles only (~150 KB), so a first visit is fast.
@@ -16,6 +18,7 @@ const CORE = [
   './css/annotations.css',
   './css/editor.css',
   './css/embed.css',
+  './css/guidedpath.css',
   './css/homepage.css',
   './css/layout.css',
   './css/main.css',
@@ -32,6 +35,7 @@ const CORE = [
   './embed-generator.html',
   './embed.html',
   './favicon.svg',
+  './guidedpath.html',
   './index.html',
   './js/app.js',
   './js/config.js',
@@ -54,6 +58,9 @@ const EXTRA = [
   './assets/icons/logo-maskable.svg',
   './assets/icons/logo.svg',
   './deployment/vercel.json',
+  './js/audio/dsp.js',
+  './js/audio/graph.js',
+  './js/audio/wav.js',
   './js/editor/document-editor.js',
   './js/editor/export.js',
   './js/editor/image-editor.js',
@@ -62,11 +69,22 @@ const EXTRA = [
   './js/embed/api.js',
   './js/embed/config.js',
   './js/embed/messaging.js',
+  './js/guidedpath/coords.js',
+  './js/guidedpath/lumatour.js',
+  './js/guidedpath/manager.js',
+  './js/guidedpath/model.js',
+  './js/guidedpath/narration.js',
+  './js/guidedpath/player.js',
+  './js/guidedpath/quiz.js',
+  './js/guidedpath/spotlight.js',
+  './js/guidedpath/storage.js',
+  './js/guidedpath/studio.js',
   './js/pages/about.js',
   './js/pages/docs.js',
   './js/pages/editor.js',
   './js/pages/embed-generator.js',
   './js/pages/embed.js',
+  './js/pages/guidedpath.js',
   './js/pages/home.js',
   './js/pages/library.js',
   './js/pages/settings.js',
@@ -81,6 +99,7 @@ const EXTRA = [
   './js/storage/database.js',
   './js/storage/history.js',
   './js/storage/library.js',
+  './js/tools/audio.js',
   './js/tools/catalog.js',
   './js/tools/compress.js',
   './js/tools/convert.js',

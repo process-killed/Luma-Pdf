@@ -33,17 +33,16 @@ for (const page of pages) {
     const endIdx = html.indexOf(END, existing);
     if (endIdx !== -1) {
       const comment = html.slice(existing, html.indexOf('-->', existing));
-      if (!sheets.length) {
-        const recorded = comment.match(/css:([^>]*?)-->/);
-        if (recorded) {
-          sheets = recorded[1].split(',').map((f) => f.trim()).filter((f) => f.startsWith('css/'));
-        }
-      }
-      if (!sheets.length) {
+      let recorded = [];
+      const list = comment.match(/css:([^>]*?)-->/);
+      if (list) recorded = list[1].split(',').map((f) => f.trim()).filter((f) => f.startsWith('css/'));
+      if (!recorded.length) {
         // Older blocks had no list: recover it from the per-file comments inside.
         const oldBlock = html.slice(existing, endIdx);
-        sheets = [...oldBlock.matchAll(/\/\* (css\/[\w\-./]+\.css) \*\//g)].map((m) => m[1]);
+        recorded = [...oldBlock.matchAll(/\/\* (css\/[\w\-./]+\.css) \*\//g)].map((m) => m[1]);
       }
+      // Keep every stylesheet that was already inlined and append any newly linked one.
+      sheets = [...recorded, ...sheets.filter((f) => !recorded.includes(f))];
       html = html.slice(0, existing) + html.slice(endIdx + END.length);
     }
   }
